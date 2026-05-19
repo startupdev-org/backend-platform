@@ -17,7 +17,6 @@ import com.platform.dto.business.BusinessRequestDTO;
 import com.platform.dto.business.BusinessResponseDTO;
 import com.platform.exception.BusinessException;
 import com.platform.exception.ResourceNotFoundException;
-import com.platform.repository.ReviewRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
@@ -40,9 +39,6 @@ class BusinessServiceTest {
 
     @Mock
     private BusinessRepository businessRepository;
-
-    @Mock
-    private ReviewRepository reviewRepository;
 
     @Mock
     private ProvidedServicesService providedServicesService;
@@ -225,9 +221,6 @@ class BusinessServiceTest {
         when(businessRepository.save(any()))
                 .thenAnswer(i -> i.getArgument(0));
 
-        when(reviewRepository.getAverageRatingByBusiness(any()))
-                .thenReturn(5.0);
-
         when(userService.getUserById(owner.getId()))
                 .thenReturn(owner);
 
@@ -272,13 +265,10 @@ class BusinessServiceTest {
         when(businessRepository.findById(business.getId()))
                 .thenReturn(Optional.of(business));
 
-        when(reviewRepository.getAverageRatingByBusiness(any()))
-                .thenReturn(4.0);
-
         when(userService.getUserById(owner.getId()))
                 .thenReturn(owner);
 
-        when(providedServicesService.getBusinessServices(any()))  // missing
+        when(providedServicesService.getBusinessServices(any()))
                 .thenReturn(createProvidedServicesDTOList());
 
         when(employeeService.getBusinessEmployeesList(any()))
@@ -322,9 +312,6 @@ class BusinessServiceTest {
         when(businessRepository.findBySlug(business.getSlug()))
                 .thenReturn(Optional.of(business));
 
-        when(reviewRepository.getAverageRatingByBusiness(any()))
-                .thenReturn(3.5);
-
         when(providedServicesService.getBusinessServices(business.getId()))
                 .thenReturn(List.of());
 
@@ -352,9 +339,6 @@ class BusinessServiceTest {
 
         when(businessRepository.findByCity("Chisinau"))
                 .thenReturn(List.of(business));
-
-        when(reviewRepository.getAverageRatingByBusiness(any()))
-                .thenReturn(5.0);
 
         when(providedServicesService.getBusinessServices(business.getId()))
                 .thenReturn(List.of());
@@ -394,9 +378,6 @@ class BusinessServiceTest {
 
         when(businessRepository.save(any()))
                 .thenAnswer(i -> i.getArgument(0));
-
-        when(reviewRepository.getAverageRatingByBusiness(any()))
-                .thenReturn(5.0);
 
         when(providedServicesService.getBusinessServices(business.getId()))
                 .thenReturn(List.of());
@@ -479,9 +460,6 @@ class BusinessServiceTest {
 
         when(businessRepository.findByOwnerId(userId))
                 .thenReturn(List.of(business));
-
-        when(reviewRepository.getAverageRatingByBusiness(any()))
-                .thenReturn(4.0);
 
         when(providedServicesService.getBusinessServices(business.getId()))
                 .thenReturn(List.of());

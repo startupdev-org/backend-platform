@@ -11,7 +11,6 @@ import com.platform.entity.User;
 import com.platform.exception.BusinessException;
 import com.platform.exception.ResourceNotFoundException;
 import com.platform.repository.BusinessRepository;
-import com.platform.repository.ReviewRepository;
 import com.platform.utils.SlugGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -30,7 +29,6 @@ import java.util.*;
 public class BusinessService {
 
     private final BusinessRepository businessRepository;
-    private final ReviewRepository reviewRepository;
     private final UserService userService;
     private final ProvidedServicesService providedServicesService;
     private final EmployeeService employeeService;
@@ -145,17 +143,12 @@ public class BusinessService {
     }
 
     private BusinessResponseDTO toDTO(Business business) {
-        Double avgRating = reviewRepository.getAverageRatingByBusiness(business.getId());
-
         List<ServiceResponseDTO> businessServices = providedServicesService.getBusinessServices(business.getId());
-
         User owner = userService.getUserById(business.getOwner().getId());
-
         List<EmployeeResponseDTO> employeeList = employeeService.getBusinessEmployeesList(business.getId());
-
         Set<BusinessFeatureDTO> featureList = featureService.getAllFeatures(business.getId());
 
-        return BusinessMapper.toDTO(business, avgRating, businessServices, employeeList, featureList, owner);
+        return BusinessMapper.toDTO(business, businessServices, employeeList, featureList, owner);
     }
 
     private User getUser() {

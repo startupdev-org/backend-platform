@@ -28,7 +28,6 @@ public class BusinessMapper {
         entity.setDayOfWeek(dto.getDayOfWeek());
         entity.setOpenTime(dto.getOpenTime());
         entity.setCloseTime(dto.getCloseTime());
-        entity.setCloseTime(dto.getCloseTime());
         return entity;
     }
 
@@ -42,50 +41,12 @@ public class BusinessMapper {
         return hours.stream().map(BusinessMapper::toEntity).toList();
     }
 
-    public static BusinessResponseDTO toDTO(Business business, Double averageRating) {
-        return BusinessResponseDTO.builder()
-                .id(business.getId())
-                .name(business.getName())
-                .slug(business.getSlug())
-                .description(business.getDescription())
-                .address(business.getAddress())
-                .city(business.getCity())
-                .phone(business.getPhone())
-                .website(business.getWebsite())
-                .logoUrl(business.getLogoUrl())
-                .coverImageUrl(business.getCoverImageUrl())
-                .ratingOverall(averageRating != null ? averageRating : 0.0)
-                .createdAt(business.getCreatedAt())
-                .updatedAt(business.getUpdatedAt())
-                .businessWorkingHours(toWorkingHoursDTOList(business.getWorkingHours()))
-                .build();
-    }
-
-    public static BusinessResponseDTO toDTO(Business business, Double averageRating, List<ServiceResponseDTO> services) {
-        return BusinessResponseDTO.builder()
-                .id(business.getId())
-                .name(business.getName())
-                .slug(business.getSlug())
-                .description(business.getDescription())
-                .address(business.getAddress())
-                .city(business.getCity())
-                .phone(business.getPhone())
-                .website(business.getWebsite())
-                .logoUrl(business.getLogoUrl())
-                .coverImageUrl(business.getCoverImageUrl())
-                .ratingOverall(averageRating != null ? averageRating : 0.0)
-                .createdAt(business.getCreatedAt())
-                .updatedAt(business.getUpdatedAt())
-                .businessWorkingHours(toWorkingHoursDTOList(business.getWorkingHours()))
-                .providedServices(services)
-                .build();
-    }
-
     public static BusinessResponseDTO toDTO(
             Business business,
-            Double averageRating,
             List<ServiceResponseDTO> services,
-            Set<BusinessFeatureDTO> features
+            List<EmployeeResponseDTO> employeeList,
+            Set<BusinessFeatureDTO> features,
+            User owner
     ) {
         return BusinessResponseDTO.builder()
                 .id(business.getId())
@@ -98,16 +59,18 @@ public class BusinessMapper {
                 .website(business.getWebsite())
                 .logoUrl(business.getLogoUrl())
                 .coverImageUrl(business.getCoverImageUrl())
-                .ratingOverall(averageRating != null ? averageRating : 0.0)
+                .ratingOverall(business.getRatingOverall() != null ? business.getRatingOverall() : 0.0)
                 .createdAt(business.getCreatedAt())
                 .updatedAt(business.getUpdatedAt())
+                .owner(owner != null ? toDTO(owner) : null)
                 .businessWorkingHours(toWorkingHoursDTOList(business.getWorkingHours()))
                 .providedServices(services)
+                .employeeList(employeeList)
                 .businessFeatures(features)
                 .build();
     }
 
-    public static Business toDTO(BusinessResponseDTO businessDTO, Double averageRating, List<ProvidedService> services) {
+    public static Business toEntity(BusinessResponseDTO businessDTO, List<ProvidedService> services) {
         return Business.builder()
                 .id(businessDTO.getId())
                 .name(businessDTO.getName())
@@ -119,81 +82,11 @@ public class BusinessMapper {
                 .website(businessDTO.getWebsite())
                 .logoUrl(businessDTO.getLogoUrl())
                 .coverImageUrl(businessDTO.getCoverImageUrl())
-                .ratingOverall(averageRating != null ? averageRating : 0.0)
+                .ratingOverall(businessDTO.getRatingOverall())
                 .createdAt(businessDTO.getCreatedAt())
                 .updatedAt(businessDTO.getUpdatedAt())
                 .workingHours(fromWorkingHoursDTOList(businessDTO.getBusinessWorkingHours()))
                 .providedServices(services)
-
-                .build();
-    }
-
-    public static BusinessResponseDTO toDTO(Business business, Double averageRating, List<ServiceResponseDTO> services, User owner) {
-        return BusinessResponseDTO.builder()
-                .id(business.getId())
-                .name(business.getName())
-                .slug(business.getSlug())
-                .description(business.getDescription())
-                .address(business.getAddress())
-                .city(business.getCity())
-                .phone(business.getPhone())
-                .website(business.getWebsite())
-                .logoUrl(business.getLogoUrl())
-                .coverImageUrl(business.getCoverImageUrl())
-                .ratingOverall(averageRating != null ? averageRating : 0.0)
-                .createdAt(business.getCreatedAt())
-                .updatedAt(business.getUpdatedAt())
-                .owner(toDTO(owner))
-                .businessWorkingHours(toWorkingHoursDTOList(business.getWorkingHours()))
-                .providedServices(services)
-
-                .build();
-    }
-
-    public static BusinessResponseDTO toDTO(Business business, Double averageRating, List<ServiceResponseDTO> services, List<EmployeeResponseDTO> empployeeList, User owner) {
-        return BusinessResponseDTO.builder()
-                .id(business.getId())
-                .name(business.getName())
-                .slug(business.getSlug())
-                .description(business.getDescription())
-                .address(business.getAddress())
-                .city(business.getCity())
-                .phone(business.getPhone())
-                .website(business.getWebsite())
-                .logoUrl(business.getLogoUrl())
-                .coverImageUrl(business.getCoverImageUrl())
-                .ratingOverall(averageRating != null ? averageRating : 0.0)
-                .createdAt(business.getCreatedAt())
-                .updatedAt(business.getUpdatedAt())
-                .owner(toDTO(owner))
-                .employeeList(empployeeList)
-                .businessWorkingHours(toWorkingHoursDTOList(business.getWorkingHours()))
-                .providedServices(services)
-
-                .build();
-    }
-
-    public static BusinessResponseDTO toDTO(Business business, Double averageRating, List<ServiceResponseDTO> services, List<EmployeeResponseDTO> empployeeList, Set<BusinessFeatureDTO> featureList, User owner) {
-        return BusinessResponseDTO.builder()
-                .id(business.getId())
-                .name(business.getName())
-                .slug(business.getSlug())
-                .description(business.getDescription())
-                .address(business.getAddress())
-                .city(business.getCity())
-                .phone(business.getPhone())
-                .website(business.getWebsite())
-                .logoUrl(business.getLogoUrl())
-                .coverImageUrl(business.getCoverImageUrl())
-                .ratingOverall(averageRating != null ? averageRating : 0.0)
-                .createdAt(business.getCreatedAt())
-                .updatedAt(business.getUpdatedAt())
-                .owner(toDTO(owner))
-                .employeeList(empployeeList)
-                .businessWorkingHours(toWorkingHoursDTOList(business.getWorkingHours()))
-                .businessFeatures(featureList)
-                .providedServices(services)
-
                 .build();
     }
 

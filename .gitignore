@@ -90,6 +90,11 @@ nb-configuration.xml
 *.log
 
 node_modules
-src/main/resources/secrets.properties
+secrets.properties
 secrets.proprieties
 .env
+
+##############################
+## Nested repo (own git history, tracked separately)
+##############################
+frontend-platform/

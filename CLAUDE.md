@@ -32,7 +32,7 @@ Spring Boot 3.2 / Java 17 REST API. Package root: `com.platform`.
 
 **Auth flow**: `JwtAuthenticationFilter` intercepts every request, extracts the Bearer token via `JwtUtils`, and sets a `UsernamePasswordAuthenticationToken` in the `SecurityContextHolder`. The principal stored is the user's **email**. Services retrieve the current user by calling `SecurityContextHolder → authentication.getPrincipal() → userService.getUserByUsername(email)`.
 
-**Two roles**: `BUSINESS_ADMIN` (creates and manages businesses) and `PLATFORM_ADMIN` (full access). Role is embedded in the JWT and loaded as `ROLE_<role>` authority — no `UserDetailsService` is used.
+**Two roles**: `BUSINESS_ADMIN` (creates and manages businesses) and `PLATFORM_ADMIN` (full access). Role is embedded in the JWT and loaded as `ROLE_<role>` authority — no `UserDetailsService` is used. `@EnableMethodSecurity` is active, so `@PreAuthorize` annotations on controllers are supported in addition to the URL-level rules in `SecurityConfig`.
 
 **Key domain relationships**:
 - `User` owns one or more `Business` entities (lazy `@ManyToOne owner`).
@@ -41,6 +41,10 @@ Spring Boot 3.2 / Java 17 REST API. Package root: `com.platform`.
 - `Booking` ties a customer to a business, employee, and service.
 - `Review` is linked to a `Booking`.
 
+**Ownership enforcement**: Services call `business.isNotOwner(currentUser)` and throw `BusinessOwnershipException` (→ 403) to guard mutations. Always check ownership before modifying any resource belonging to a `Business`.
+
+**Exception semantics**: `ResourceNotFoundException` → 404, `BusinessException` → 403, `BusinessFeatureAlreadyExistsException` → 409. `DataIntegrityViolationException` from JPA is caught globally and also maps to 409. `GlobalExceptionHandler` in `com.platform.exception` handles all of these centrally — don't catch and re-throw them in services.
+
 **DTO mapping**: `BusinessMapper` (manual static methods, not MapStruct) handles `Business → BusinessResponseDTO`. Most other DTOs use plain constructors or `@Builder`. MapStruct is in the dependency and annotation processor but is not yet used widely.
 
 **Storage**: `StorageService` integrates with **Supabase Storage** via `RestTemplate`. It generates a short-lived presigned upload URL (60 s) and returns the permanent public URL. Configured via `supabase.url`, `supabase.service-key`, `supabase.bucket` in `application.yml`.
@@ -48,6 +52,8 @@ Spring Boot 3.2 / Java 17 REST API. Package root: `com.platform`.
 **Slugs**: `SlugGenerator.generate(name)` produces the unique URL-safe identifier stored on `Business.slug`.
 
 **Time slots**: `TimeSlotGenerator` generates available booking slots based on service duration.
+
+**Enums**: `User.UserRole` is an inner enum on `User`. `Booking.BookingStatus` is an inner enum on `Booking`. `ServiceDeliveryType` and `BusinessCategoryType` are top-level enums stored as `EnumType.STRING` in the DB.
 
 ## Configuration
 

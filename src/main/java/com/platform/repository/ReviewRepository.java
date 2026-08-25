@@ -14,9 +14,9 @@ import java.util.UUID;
 public interface ReviewRepository extends JpaRepository<Review, UUID> {
     Optional<Review> findByBookingId(UUID bookingId);
 
-    @Query("SELECT r FROM Review r WHERE r.booking.employee.business.id = :businessId")
+    @Query("SELECT r FROM Review r WHERE r.booking.priceEntry.employee.business.id = :businessId")
     List<Review> findByBusinessId(@Param("businessId") UUID businessId);
 
-    @Query("SELECT AVG(r.ratingOverall) FROM Review r WHERE r.booking.employee.business.id = :businessId")
+    @Query("SELECT AVG(r.ratingOverall) FROM Review r WHERE r.booking.priceEntry.employee.business.id = :businessId")
     Double getAverageRatingByBusiness(@Param("businessId") UUID businessId);
 }

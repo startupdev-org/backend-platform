@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project
+
+A vertical-agnostic SaaS booking platform for service-based businesses in Moldova — not limited to any single industry. Business owners sign up, build a public profile, and manage their services, employees, and locations; customers book appointments through that public page without needing an account. The platform does not intermediate payments between customers and businesses — customers pay directly, off-platform — so its revenue comes from subscription plans gating business and employee counts, not from transaction fees. Priority is a working, architecturally sound core product first; subscriptions and monetization follow once real usage informs the limits.
+
 ## Commands
 
 ```bash

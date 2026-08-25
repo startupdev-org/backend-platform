@@ -87,7 +87,6 @@ public class SecurityConfig {
                         // ── 8. User endpoints ─────────────────────────────────────────
                         .requestMatchers("/api/users/whoami")                                .authenticated()
 
-                        .requestMatchers("/api/storage/upload-url")                          .hasRole(ROLE_BUSINESS_ADMIN)
 
                         // ── 9. Booking & Review endpoints ─────────────────────────────
                         .requestMatchers(HttpMethod.POST,   "/api/booking")                  .authenticated()

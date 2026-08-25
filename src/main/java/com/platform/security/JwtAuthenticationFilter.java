@@ -1,6 +1,8 @@
 package com.platform.security;
 
 import com.platform.utils.JwtUtils;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,6 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -33,34 +36,53 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String jwt = extractToken(request);
 
-        if (StringUtils.hasText(jwt) && jwtUtils.validateToken(jwt)) {
+        if (StringUtils.hasText(jwt)) {
+            Optional<Claims> claims;
             try {
-                String email  = jwtUtils.getUserEmailFromToken(jwt);
-                String role   = jwtUtils.getRoleFromToken(jwt);
-                String userId = jwtUtils.getUserIdFromToken(jwt);
+                claims = jwtUtils.parseClaims(jwt);
+            } catch (ExpiredJwtException e) {
+                // Recorded so RestAuthenticationEntryPoint can say "expired" rather than a
+                // generic "authentication required" - that is what lets the frontend decide
+                // to silently re-login instead of showing an error.
+                request.setAttribute(RestAuthenticationEntryPoint.JWT_ERROR_ATTRIBUTE,
+                        RestAuthenticationEntryPoint.JWT_ERROR_EXPIRED);
+                claims = Optional.empty();
+            }
 
-                var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
-
-                var authentication = new UsernamePasswordAuthenticationToken(
-                        email, null, authorities
-                );
-
-                // Attaches IP, session info to the auth token — useful for auditing
-                authentication.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request)
-                );
-
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-                log.debug("Authenticated user '{}' with role '{}' [userId={}]", email, role, userId);
-
-            } catch (Exception e) {
-                // Token passed validation but something went wrong reading claims
-                log.error("Failed to set authentication from valid token: {}", e.getMessage());
-                SecurityContextHolder.clearContext(); // ← don't leave a partial auth
+            if (claims.isPresent()) {
+                authenticate(request, claims.get());
+            } else if (request.getAttribute(RestAuthenticationEntryPoint.JWT_ERROR_ATTRIBUTE) == null) {
+                request.setAttribute(RestAuthenticationEntryPoint.JWT_ERROR_ATTRIBUTE,
+                        RestAuthenticationEntryPoint.JWT_ERROR_INVALID);
             }
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private void authenticate(HttpServletRequest request, Claims claims) {
+        String email = jwtUtils.getUserEmailFromClaims(claims);
+        String role = jwtUtils.getRoleFromClaims(claims);
+
+        // A token with no role claim is not usable. Building "ROLE_null" would still fail
+        // closed, but as a 403 carrying an authenticated principal - far harder to diagnose
+        // than a clean 401.
+        if (!StringUtils.hasText(email) || !StringUtils.hasText(role)) {
+            log.debug("Token is missing the subject or role claim; rejecting");
+            request.setAttribute(RestAuthenticationEntryPoint.JWT_ERROR_ATTRIBUTE,
+                    RestAuthenticationEntryPoint.JWT_ERROR_INVALID);
+            return;
+        }
+
+        var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
+        var authentication = new UsernamePasswordAuthenticationToken(email, null, authorities);
+
+        // Attaches IP, session info to the auth token — useful for auditing
+        authentication.setDetails(
+                new WebAuthenticationDetailsSource().buildDetails(request));
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        log.debug("Authenticated user '{}' with role '{}'", email, role);
     }
 
     private String extractToken(HttpServletRequest request) {

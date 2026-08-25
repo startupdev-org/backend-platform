@@ -16,6 +16,8 @@ public class LoginResponse {
 
     private UUID id;
     private String email;
+    private String firstName;
+    private String lastName;
     private String role;
     private String accessToken;
     private String tokenType;
@@ -24,6 +26,8 @@ public class LoginResponse {
         return LoginResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
                 .role(user.getRole().name())
                 .accessToken(token)
                 .tokenType("Bearer")

@@ -1,28 +1,28 @@
-package com.platform.dto.auth;
+package com.platform.dto.user;
 
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Body for {@code PUT /api/users/me}.
+ *
+ * <p>Deliberately has no {@code role}, {@code isEnabled}, {@code password} or {@code email}
+ * field. Privilege escalation is closed by the shape of this type rather than by a runtime
+ * check, so it cannot be reintroduced by a careless edit to a conditional.
+ *
+ * <p>Email is absent because changing the login identifier needs a confirmation mail to the
+ * new address; without one, a stolen token locks the real owner out permanently.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class RegisterRequest {
+@Builder
+public class UpdateProfileRequest {
 
-    @Email(message = "Invalid email format")
-    @NotBlank(message = "Email is required")
-    private String email;
-
-    @NotBlank(message = "Password is required")
-    @Size(min = 8, message = "Password must be at least 8 characters")
-    private String password;
-
-    // Required here rather than via a NOT NULL column: rows predating these fields have no
-    // real value to backfill, and inventing one would erase the difference between
-    // "never collected" and "left blank".
     @NotBlank(message = "First name is required")
     @Size(max = 100, message = "First name must be at most 100 characters")
     private String firstName;

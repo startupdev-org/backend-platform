@@ -4,20 +4,26 @@ import com.platform.dto.auth.LoginRequest;
 import com.platform.dto.auth.LoginResponse;
 import com.platform.dto.auth.RegisterRequest;
 import com.platform.entity.User;
-import com.platform.exception.BusinessException;
+import com.platform.exception.EmailAlreadyRegisteredException;
+import com.platform.exception.InvalidCredentialsException;
 import com.platform.repository.UserRepository;
 import com.platform.utils.JwtUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,113 +41,177 @@ class AuthServiceTest {
     @Mock
     private JwtUtils jwtUtils;
 
-    @Test
-    void register_success() {
-        RegisterRequest request = new RegisterRequest();
-        request.setEmail("test@example.com");
-        request.setPassword("password");
+    @Captor
+    private ArgumentCaptor<User> userCaptor;
 
-        when(userRepository.existsByEmail(request.getEmail())).thenReturn(false);
-        when(passwordEncoder.encode(request.getPassword())).thenReturn("encodedPassword");
-        User savedUser = User.builder()
+    private RegisterRequest registerRequest(String email) {
+        RegisterRequest request = new RegisterRequest();
+        request.setEmail(email);
+        request.setPassword("password123");
+        request.setFirstName("Ana");
+        request.setLastName("Popescu");
+        request.setPhone("+37360000000");
+        return request;
+    }
+
+    private User persistedUser(String email) {
+        return User.builder()
                 .id(UUID.randomUUID())
-                .email(request.getEmail())
+                .email(email)
                 .password("encodedPassword")
+                .firstName("Ana")
+                .lastName("Popescu")
                 .role(User.UserRole.BUSINESS_ADMIN)
                 .build();
-        when(userRepository.save(any(User.class))).thenReturn(savedUser);
-        when(jwtUtils.generateToken(savedUser)).thenReturn("jwt-token");
+    }
+
+    // ── register ──────────────────────────────────────────────────────────────
+
+    @Test
+    void register_success() {
+        RegisterRequest request = registerRequest("test@example.com");
+
+        when(userRepository.existsByEmailIgnoreCase("test@example.com")).thenReturn(false);
+        when(passwordEncoder.encode("password123")).thenReturn("encodedPassword");
+        when(userRepository.saveAndFlush(any(User.class))).thenReturn(persistedUser("test@example.com"));
+        when(jwtUtils.generateToken(any(User.class))).thenReturn("jwt-token");
 
         LoginResponse response = authService.register(request);
 
-        assertNotNull(response);
-        assertEquals(savedUser.getEmail(), response.getEmail());
+        assertEquals("test@example.com", response.getEmail());
         assertEquals("jwt-token", response.getAccessToken());
+        assertEquals("Bearer", response.getTokenType());
+        assertEquals("Ana", response.getFirstName());
+    }
 
-        verify(userRepository).existsByEmail(request.getEmail());
-        verify(userRepository).save(any(User.class));
-        verify(jwtUtils).generateToken(savedUser);
+    /**
+     * The assertion that was missing when {@code User.isEnabled} lost its initializer to
+     * Lombok's builder and every account was created disabled.
+     */
+    @Test
+    void register_persistsEnabledBusinessAdminWithEncodedPassword() {
+        RegisterRequest request = registerRequest("test@example.com");
+
+        when(userRepository.existsByEmailIgnoreCase(anyString())).thenReturn(false);
+        when(passwordEncoder.encode("password123")).thenReturn("encodedPassword");
+        when(userRepository.saveAndFlush(any(User.class))).thenReturn(persistedUser("test@example.com"));
+        when(jwtUtils.generateToken(any(User.class))).thenReturn("jwt-token");
+
+        authService.register(request);
+
+        verify(userRepository).saveAndFlush(userCaptor.capture());
+        User saved = userCaptor.getValue();
+
+        assertTrue(saved.isEnabled(), "new accounts must be enabled");
+        assertEquals(User.UserRole.BUSINESS_ADMIN, saved.getRole());
+        assertEquals("encodedPassword", saved.getPassword());
+        assertNotEquals("password123", saved.getPassword());
+        assertEquals("Ana", saved.getFirstName());
+        assertEquals("Popescu", saved.getLastName());
     }
 
     @Test
-    void register_emailAlreadyExists_throwsException() {
-        RegisterRequest request = new RegisterRequest();
-        request.setEmail("test@example.com");
+    void register_normalizesEmailToLowercase() {
+        RegisterRequest request = registerRequest("  Test@Example.COM  ");
 
-        when(userRepository.existsByEmail(request.getEmail())).thenReturn(true);
+        when(userRepository.existsByEmailIgnoreCase("test@example.com")).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("encodedPassword");
+        when(userRepository.saveAndFlush(any(User.class))).thenReturn(persistedUser("test@example.com"));
+        when(jwtUtils.generateToken(any(User.class))).thenReturn("jwt-token");
 
-        BusinessException exception = assertThrows(BusinessException.class, () -> authService.register(request));
-        assertEquals("Email already registered", exception.getMessage());
+        authService.register(request);
 
-        verify(userRepository).existsByEmail(request.getEmail());
-        verify(userRepository, never()).save(any(User.class));
-        verify(jwtUtils, never()).generateToken(any());
+        verify(userRepository).saveAndFlush(userCaptor.capture());
+        assertEquals("test@example.com", userCaptor.getValue().getEmail());
     }
+
+    @Test
+    void register_emailAlreadyExists_throwsConflict() {
+        RegisterRequest request = registerRequest("test@example.com");
+
+        when(userRepository.existsByEmailIgnoreCase("test@example.com")).thenReturn(true);
+
+        EmailAlreadyRegisteredException ex = assertThrows(EmailAlreadyRegisteredException.class,
+                () -> authService.register(request));
+        assertEquals("Email already registered", ex.getMessage());
+        verify(userRepository, never()).saveAndFlush(any(User.class));
+    }
+
+    /** Two registrations racing past the existence check: the DB constraint is the real guard. */
+    @Test
+    void register_concurrentDuplicate_translatesConstraintViolation() {
+        RegisterRequest request = registerRequest("test@example.com");
+
+        when(userRepository.existsByEmailIgnoreCase(anyString())).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("encodedPassword");
+        when(userRepository.saveAndFlush(any(User.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate key"));
+
+        assertThrows(EmailAlreadyRegisteredException.class, () -> authService.register(request));
+    }
+
+    // ── login ─────────────────────────────────────────────────────────────────
 
     @Test
     void login_success() {
         LoginRequest request = new LoginRequest();
         request.setEmail("test@example.com");
-        request.setPassword("password");
+        request.setPassword("password123");
 
-        User user = User.builder()
-                .id(UUID.randomUUID())
-                .email(request.getEmail())
-                .password("encodedPassword")
-                .role(User.UserRole.BUSINESS_ADMIN)
-                .build();
-
-        when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(user));
-        when(passwordEncoder.matches(request.getPassword(), user.getPassword())).thenReturn(true);
+        User user = persistedUser("test@example.com");
+        when(userRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("password123", "encodedPassword")).thenReturn(true);
         when(jwtUtils.generateToken(user)).thenReturn("jwt-token");
 
         LoginResponse response = authService.login(request);
 
-        assertNotNull(response);
-        assertEquals(user.getEmail(), response.getEmail());
+        assertEquals("test@example.com", response.getEmail());
         assertEquals("jwt-token", response.getAccessToken());
-
-        verify(userRepository).findByEmail(request.getEmail());
-        verify(passwordEncoder).matches(request.getPassword(), user.getPassword());
-        verify(jwtUtils).generateToken(user);
+        assertEquals("BUSINESS_ADMIN", response.getRole());
     }
 
     @Test
-    void login_invalidEmail_throwsException() {
+    void login_isCaseInsensitive() {
         LoginRequest request = new LoginRequest();
-        request.setEmail("wrong@example.com");
+        request.setEmail("TEST@Example.com");
+        request.setPassword("password123");
 
-        when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.empty());
+        User user = persistedUser("test@example.com");
+        when(userRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
+        when(jwtUtils.generateToken(user)).thenReturn("jwt-token");
 
-        BusinessException exception = assertThrows(BusinessException.class, () -> authService.login(request));
-        assertEquals("Invalid credentials", exception.getMessage());
-
-        verify(userRepository).findByEmail(request.getEmail());
-        verify(passwordEncoder, never()).matches(any(), any());
-        verify(jwtUtils, never()).generateToken(any());
+        assertEquals("test@example.com", authService.login(request).getEmail());
     }
 
     @Test
-    void login_invalidPassword_throwsException() {
+    void login_unknownEmail_throwsInvalidCredentials() {
+        LoginRequest request = new LoginRequest();
+        request.setEmail("missing@example.com");
+        request.setPassword("password123");
+
+        when(userRepository.findByEmailIgnoreCase("missing@example.com")).thenReturn(Optional.empty());
+
+        InvalidCredentialsException ex = assertThrows(InvalidCredentialsException.class,
+                () -> authService.login(request));
+        assertEquals("Invalid credentials", ex.getMessage());
+    }
+
+    @Test
+    void login_invalidPassword_throwsInvalidCredentials() {
         LoginRequest request = new LoginRequest();
         request.setEmail("test@example.com");
         request.setPassword("wrongPassword");
 
-        User user = User.builder()
-                .id(UUID.randomUUID())
-                .email(request.getEmail())
-                .password("encodedPassword")
-                .role(User.UserRole.BUSINESS_ADMIN)
-                .build();
+        when(userRepository.findByEmailIgnoreCase("test@example.com"))
+                .thenReturn(Optional.of(persistedUser("test@example.com")));
+        when(passwordEncoder.matches("wrongPassword", "encodedPassword")).thenReturn(false);
 
-        when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(user));
-        when(passwordEncoder.matches(request.getPassword(), user.getPassword())).thenReturn(false);
+        InvalidCredentialsException ex = assertThrows(InvalidCredentialsException.class,
+                () -> authService.login(request));
 
-        BusinessException exception = assertThrows(BusinessException.class, () -> authService.login(request));
-        assertEquals("Invalid credentials", exception.getMessage());
-
-        verify(userRepository).findByEmail(request.getEmail());
-        verify(passwordEncoder).matches(request.getPassword(), user.getPassword());
-        verify(jwtUtils, never()).generateToken(any());
+        // Identical to the unknown-email message: distinguishing them would make this
+        // endpoint a user-enumeration oracle.
+        assertEquals("Invalid credentials", ex.getMessage());
     }
 }

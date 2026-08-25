@@ -1,5 +1,6 @@
 package com.platform.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -26,8 +27,22 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
+    // Never serialized. Belt-and-braces: any DTO or endpoint that accidentally holds a
+    // User entity still cannot leak the hash.
+    @JsonIgnore
     @Column(nullable = false)
     private String password;
+
+    // Nullable in the DB because rows created before these columns existed have no real
+    // value to backfill. Required at the write path instead - see RegisterRequest.
+    @Column(length = 100)
+    private String firstName;
+
+    @Column(length = 100)
+    private String lastName;
+
+    @Column(length = 30)
+    private String phone;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -39,6 +54,9 @@ public class User {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    // @Builder.Default is load-bearing: without it Lombok's builder ignores the field
+    // initializer and every registered user lands with is_enabled = false.
+    @Builder.Default
     @Column(nullable = false, columnDefinition = "boolean default true")
     private boolean isEnabled = true;
 

@@ -42,7 +42,10 @@ public class EmployeeService {
         validateBusinessOwnership(business, currentUser);
 
         Employee employee = Employee.builder()
-                .name(dto.getName())
+                .firstName(dto.getFirstName())
+                .lastName(dto.getLastName())
+                .email(dto.getEmail())
+                .phoneNumber(dto.getPhoneNumber())
                 .photoUrl(dto.getPhotoUrl())
                 .active(true)
                 .business(business)
@@ -103,7 +106,14 @@ public class EmployeeService {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException(EMPLOYEE_NOT_FOUND_EXCEPTION));
 
-        employee.setName(dto.getName());
+        employee.setFirstName(dto.getFirstName());
+        employee.setLastName(dto.getLastName());
+        if (dto.getEmail() != null) {
+            employee.setEmail(dto.getEmail());
+        }
+        if (dto.getPhoneNumber() != null) {
+            employee.setPhoneNumber(dto.getPhoneNumber());
+        }
         employee.setPhotoUrl(dto.getPhotoUrl());
         if (dto.getActive() != null) {
             employee.setActive(dto.getActive());
@@ -136,7 +146,10 @@ public class EmployeeService {
     private EmployeeResponseDTO toDTO(Employee employee) {
         return EmployeeResponseDTO.builder()
                 .id(employee.getId())
-                .name(employee.getName())
+                .firstName(employee.getFirstName())
+                .lastName(employee.getLastName())
+                .email(employee.getEmail())
+                .phoneNumber(employee.getPhoneNumber())
                 .photoUrl(employee.getPhotoUrl())
                 .businessId(employee.getBusiness().getId())
                 .active(employee.getActive())

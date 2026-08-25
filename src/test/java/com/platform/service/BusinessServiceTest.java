@@ -167,15 +167,18 @@ class BusinessServiceTest {
 
     private List<Employee> createEmployeeList() {
         Employee employeeOne = Employee.builder()
-                .name("Employee One")
+                .firstName("Employee")
+                .lastName("One")
                 .build();
 
         Employee employeeSecond = Employee.builder()
-                .name("Employee Second")
+                .firstName("Employee")
+                .lastName("Second")
                 .build();
 
         Employee employeeThird = Employee.builder()
-                .name("Employee Third")
+                .firstName("Employee")
+                .lastName("Third")
                 .build();
 
         return List.of(employeeOne, employeeSecond, employeeThird);
@@ -183,15 +186,18 @@ class BusinessServiceTest {
 
     private List<EmployeeResponseDTO> createEmployeeDTOList() {
         EmployeeResponseDTO employeeOne = EmployeeResponseDTO.builder()
-                .name("EmployeeResponseDTO One")
+                .firstName("EmployeeResponseDTO")
+                .lastName("One")
                 .build();
 
         EmployeeResponseDTO employeeSecond = EmployeeResponseDTO.builder()
-                .name("EmployeeResponseDTO Second")
+                .firstName("EmployeeResponseDTO")
+                .lastName("Second")
                 .build();
 
         EmployeeResponseDTO employeeThird = EmployeeResponseDTO.builder()
-                .name("Employee Third")
+                .firstName("Employee")
+                .lastName("Third")
                 .build();
 
         return List.of(employeeOne, employeeSecond, employeeThird);

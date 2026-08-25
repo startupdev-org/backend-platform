@@ -25,7 +25,14 @@ public class Employee {
     private UUID id;
 
     @Column(nullable = false)
-    private String name;
+    private String firstName;
+
+    @Column(nullable = false)
+    private String lastName;
+
+    private String email;
+
+    private String phoneNumber;
 
     private String photoUrl;
 

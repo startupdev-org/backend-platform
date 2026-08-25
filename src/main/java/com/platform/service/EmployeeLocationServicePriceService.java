@@ -158,7 +158,7 @@ public class EmployeeLocationServicePriceService {
         return new EmployeeLocationServicePriceResponseDTO(
                 e.getId(),
                 e.getEmployee().getId(),
-                e.getEmployee().getName(),
+                e.getEmployee().getFirstName() + " " + e.getEmployee().getLastName(),
                 e.getService().getId(),
                 e.getService().getName(),
                 e.getLocation().getId(),

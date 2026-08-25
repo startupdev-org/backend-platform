@@ -50,9 +50,6 @@ public class ProvidedService {
     @JoinColumn(name = "business_id", nullable = false)
     private Business business;
 
-    @OneToMany(mappedBy = "providedService", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Booking> bookings;
-
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

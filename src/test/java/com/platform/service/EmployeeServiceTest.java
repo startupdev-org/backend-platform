@@ -7,6 +7,7 @@ import com.platform.entity.Employee;
 import com.platform.entity.User;
 import com.platform.exception.BusinessException;
 import com.platform.exception.ResourceNotFoundException;
+import com.platform.repository.BookingRepository;
 import com.platform.repository.BusinessRepository;
 import com.platform.repository.EmployeeRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -41,6 +42,9 @@ class EmployeeServiceTest {
 
     @Mock
     private BusinessRepository businessRepository;
+
+    @Mock
+    private BookingRepository bookingRepository;
 
     @Mock
     private UserService userService;
@@ -306,8 +310,13 @@ class EmployeeServiceTest {
         when(employeeRepository.findById(employee.getId()))
                 .thenReturn(Optional.of(employee));
 
+        when(bookingRepository.findByEmployeeId(employee.getId()))
+                .thenReturn(new ArrayList<>());
+
         employeeService.deleteEmployee(business.getId(), employee.getId(), owner);
 
+        verify(bookingRepository).findByEmployeeId(employee.getId());
+        verify(bookingRepository).deleteAll(new ArrayList<>());
         verify(employeeRepository).delete(employee);
     }
 

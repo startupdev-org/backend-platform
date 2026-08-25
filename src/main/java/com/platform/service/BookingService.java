@@ -4,11 +4,15 @@ import com.platform.dto.booking.BookingRequestDTO;
 import com.platform.dto.booking.BookingResponseDTO;
 import com.platform.entity.Booking;
 import com.platform.entity.Employee;
+import com.platform.entity.EmployeeLocationServicePrice;
+import com.platform.entity.Location;
 import com.platform.entity.ProvidedService;
 import com.platform.exception.BusinessException;
 import com.platform.exception.ResourceNotFoundException;
 import com.platform.repository.BookingRepository;
+import com.platform.repository.EmployeeLocationServicePriceRepository;
 import com.platform.repository.EmployeeRepository;
+import com.platform.repository.LocationRepository;
 import com.platform.repository.ServiceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,6 +30,8 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final EmployeeRepository employeeRepository;
     private final ServiceRepository serviceRepository;
+    private final LocationRepository locationRepository;
+    private final EmployeeLocationServicePriceRepository priceRepository;
 
     @Transactional
     public BookingResponseDTO createBooking(BookingRequestDTO dto) {
@@ -34,6 +40,16 @@ public class BookingService {
 
         ProvidedService providedService = serviceRepository.findById(dto.getServiceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Service not found"));
+
+        Location location = resolveLocation(dto.getLocationId(), employee);
+
+        EmployeeLocationServicePrice priceEntry = priceRepository
+                .findByEmployeeIdAndServiceIdAndLocationId(
+                        dto.getEmployeeId(),
+                        dto.getServiceId(),
+                        location.getId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Employee does not offer this service at the requested location"));
 
         LocalDateTime endTime = dto.getStartTime().plusMinutes(providedService.getDurationMinutes());
 
@@ -52,13 +68,22 @@ public class BookingService {
                 .customerEmail(dto.getCustomerEmail())
                 .startTime(dto.getStartTime())
                 .endTime(endTime)
-                .employee(employee)
-                .providedService(providedService)
+                .priceEntry(priceEntry)
                 .status(Booking.BookingStatus.CONFIRMED)
                 .build();
 
         booking = bookingRepository.save(booking);
         return toDTO(booking);
+    }
+
+    private Location resolveLocation(UUID locationId, Employee employee) {
+        if (locationId != null) {
+            return locationRepository.findById(locationId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Location not found"));
+        }
+        return locationRepository.findByBusinessIdAndIsDefaultLocationTrue(employee.getBusiness().getId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No default location found and no location specified in request"));
     }
 
     public BookingResponseDTO getBooking(UUID id) {

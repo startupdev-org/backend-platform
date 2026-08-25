@@ -33,4 +33,6 @@ public class BookingRequestDTO {
 
     @NotNull(message = "Start time is required")
     private LocalDateTime startTime;
+
+    private UUID locationId;
 }

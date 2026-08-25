@@ -11,6 +11,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -53,25 +55,29 @@ public class ServiceController {
         return ResponseEntity.ok(service);
     }
 
-    @Operation(summary = "List all services", description = "Returns all services for the specified business")
+    @Operation(summary = "List all services", description = "Returns paginated services for the specified business")
     @ApiResponse(responseCode = "200", description = "Services retrieved successfully")
     @ApiResponse(responseCode = "404", description = "Business not found")
     @GetMapping
-    public ResponseEntity<List<ServiceResponseDTO>> listServices(
+    public ResponseEntity<Page<ServiceResponseDTO>> listServices(
             @Parameter(description = "Business UUID", example = "123e4567-e89b-12d3-a456-426614174000")
-            @PathVariable UUID businessId) {
-        List<ServiceResponseDTO> services = providedServicesService.getBusinessServices(businessId);
+            @PathVariable UUID businessId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Page<ServiceResponseDTO> services = providedServicesService.getBusinessServices(businessId, PageRequest.of(page, size));
         return ResponseEntity.ok(services);
     }
 
-    @Operation(summary = "List active services", description = "Returns only active services for the specified business")
+    @Operation(summary = "List active services", description = "Returns paginated active services for the specified business")
     @ApiResponse(responseCode = "200", description = "Active services retrieved successfully")
     @ApiResponse(responseCode = "404", description = "Business not found")
     @GetMapping("/active")
-    public ResponseEntity<List<ServiceResponseDTO>> listActiveServices(
+    public ResponseEntity<Page<ServiceResponseDTO>> listActiveServices(
             @Parameter(description = "Business UUID", example = "123e4567-e89b-12d3-a456-426614174000")
-            @PathVariable UUID businessId) {
-        List<ServiceResponseDTO> services = providedServicesService.getActiveServices(businessId);
+            @PathVariable UUID businessId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Page<ServiceResponseDTO> services = providedServicesService.getActiveServices(businessId, PageRequest.of(page, size));
         return ResponseEntity.ok(services);
     }
 

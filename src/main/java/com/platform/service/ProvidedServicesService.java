@@ -11,6 +11,9 @@ import com.platform.exception.ServiceNotFoundException;
 import com.platform.repository.BusinessRepository;
 import com.platform.repository.ServiceRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -71,6 +74,22 @@ public class ProvidedServicesService {
                 .stream()
                 .map(this::toDTO)
                 .toList();
+    }
+
+    public Page<ServiceResponseDTO> getBusinessServices(UUID businessId, Pageable pageable) {
+        List<ProvidedService> services = serviceRepository.findByBusinessId(businessId);
+        return new PageImpl<>(
+                services.stream().map(this::toDTO).toList(),
+                pageable,
+                services.size());
+    }
+
+    public Page<ServiceResponseDTO> getActiveServices(UUID businessId, Pageable pageable) {
+        List<ProvidedService> services = serviceRepository.findByBusinessIdAndActive(businessId, true);
+        return new PageImpl<>(
+                services.stream().map(this::toDTO).toList(),
+                pageable,
+                services.size());
     }
 
     @Transactional

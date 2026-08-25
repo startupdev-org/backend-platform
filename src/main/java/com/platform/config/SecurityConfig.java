@@ -67,8 +67,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT,    "/api/business/*/employee/**")   .hasRole(ROLE_BUSINESS_ADMIN)
                         .requestMatchers(HttpMethod.DELETE, "/api/business/*/employee/**")   .hasRole(ROLE_BUSINESS_ADMIN)
                         // Read operations → any authenticated user
-                        .requestMatchers(HttpMethod.GET,    "/api/business/*/employee/**")   .authenticated()
-                        .requestMatchers(HttpMethod.GET,    "/api/business/*/employee")      .authenticated()
+                        .requestMatchers(HttpMethod.GET,    "/api/business/*/employee/**")   .permitAll()
+                        .requestMatchers(HttpMethod.GET,    "/api/business/*/employee")      .permitAll()
 
                         // ── 4. Working-hours endpoints ────────────────────────────────
                         .requestMatchers(HttpMethod.GET,    "/api/business/*/working-hours") .authenticated()

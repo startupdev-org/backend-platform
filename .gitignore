@@ -91,10 +91,5 @@ nb-configuration.xml
 
 node_modules
 secrets.properties
-secrets.proprieties
+!secrets.properties.example
 .env
-
-##############################
-## Nested repo (own git history, tracked separately)
-##############################
-frontend-platform/

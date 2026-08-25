@@ -6,4 +6,5 @@ public enum BusinessCategoryType {
     SPA,
     NAILS
 
+
 }

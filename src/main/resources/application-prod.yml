@@ -1,0 +1,26 @@
+# Render prod service. Quiet logs, no SQL or bound parameters on stdout,
+# no publicly reachable API docs.
+spring:
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+
+  datasource:
+    hikari:
+      maximum-pool-size: 10
+
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
+
+logging:
+  level:
+    root: WARN
+    com.platform: INFO
+    org.springframework.web: WARN

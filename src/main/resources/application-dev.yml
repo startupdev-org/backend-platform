@@ -1,12 +1,13 @@
+# Local machine and the Render dev service. Verbose, but never destructive:
+# schema changes go through Flyway migrations, not ddl-auto.
 spring:
   jpa:
     show-sql: true
-    hibernate:
-      ddl-auto: create-drop
 
 logging:
   level:
     com.platform: DEBUG
     org.springframework.security: DEBUG
+    org.springframework.web: INFO
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE

@@ -18,7 +18,10 @@ public class EmployeeMapper {
     public static EmployeeResponseDTO toDTO(Employee employee) {
         return EmployeeResponseDTO.builder()
                 .id(employee.getId())
-                .name(employee.getName())
+                .firstName(employee.getFirstName())
+                .lastName(employee.getLastName())
+                .email(employee.getEmail())
+                .phoneNumber(employee.getPhoneNumber())
                 .photoUrl(employee.getPhotoUrl())
                 .businessId(employee.getBusiness().getId())
                 .active(employee.getActive())

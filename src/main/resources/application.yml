@@ -1,19 +1,32 @@
 spring:
   application:
-    name: booking-platform
+    name: service-platform
+
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE}
+
+  # Local development only: a gitignored file next to this one.
+  # Deployed environments supply the same keys as real environment variables.
   config:
     import: optional:classpath:secrets.properties
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    url: ${DB_URL}
     username: ${DB_USER}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
+  # Flyway owns the schema in every environment. ddl-auto never writes.
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
+
   jpa:
     hibernate:
-#      must change !!! TODO
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -31,34 +44,19 @@ spring:
       max-request-size: 10MB
 
 jwt:
-  secret: ${JWT_SECRET:MyVerySecureJwtSecretKeyThatIsAtLeast32CharactersLongForHS256Algorithm}
+  secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION:86400000}
 
 server:
-  port: ${SERVER_PORT:8080}
+  # Render injects PORT; SERVER_PORT is the local override.
+  port: ${PORT:${SERVER_PORT:8080}}
   servlet:
     context-path: /
 
-supabase:
-  url: ${SUPABASE_URL}
-  service-key: ${SERVICE_ROLE_KEY}
-  bucket: business-assets
-
 cors:
   allowed-origins: ${ALLOWED_ORIGINS}
-#springdoc:
-#  swagger-ui:
-#    path: /swagger-ui.html
-#    operations-sorter: method
-#    tags-sorter: alpha
-#  api-docs:
-#    path: /v3/api-docs
 
 logging:
   level:
     root: INFO
-    com.platform: DEBUG
-    org.springframework.security: trace
-    org.springframework.web: INFO
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    com.platform: INFO

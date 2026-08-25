@@ -1,14 +1,14 @@
-name: Build and deploy (dev)
+name: Build and deploy (prod)
 
 on:
   push:
     branches:
-      - dev
+      - main
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  DEPLOY_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+  DEPLOY_URL: ${{ secrets.RENDER_PROD_DEPLOY_HOOK_URL }}
 
 jobs:
   build-and-push:
@@ -39,12 +39,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Two tags: :latest for the Render service to track, and the immutable
+      # commit SHA so a rollback has something concrete to point at.
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
       - name: Deploy on Render
         run: curl --fail --silent --show-error "$DEPLOY_URL"

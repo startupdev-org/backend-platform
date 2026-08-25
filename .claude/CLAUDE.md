@@ -122,6 +122,28 @@ SERVER_PORT  # local only; Render supplies PORT, which wins
 
 Tests use **Mockito** (`@ExtendWith(MockitoExtension.class)`) — no Spring context, no database. The `SecurityContextHolder` is manually seeded in `@BeforeEach` and cleared in `@AfterEach`. Tests live under `src/test/java/com/platform/`.
 
+## Git & GitHub workflow
+Every task gets its own branch, own commits and own messages with this. It is important everything to be organized and with clear messages 
+
+### Never commit directly to main.
+
+Branch naming: feat/short-description, fix/short-description, chore/short-description
+
+When a task is finished, or when Marius says "push to GitHub":
+
+Create a branch for the task if not already on one: git checkout -b feat/task-name
+Stage and commit all changes with a clear conventional commit message (feat:, fix:, chore:, database:, etc.)
+Push the branch: git push origin feat/task-name
+Remind Marius to open a Pull Request on GitHub so the automated code review runs
+Never git push origin main directly. Marius merges branches into main himself via GitHub PRs.
+
+Commit message format:
+
+type: short summary
+
+- bullet describing what changed and why
+- another bullet if needed
+
 ## CI / Deployment
 
 Two workflows, one per deployed environment. Push to `dev` → `.github/workflows/dev.yml`: `mvn test` → Docker image pushed to GHCR as `:dev` → `RENDER_DEPLOY_HOOK_URL`. Push to `main` → `.github/workflows/prod.yml`: same, tagged `:latest` and `:<sha>` (the SHA tag is what a rollback points at) → `RENDER_PROD_DEPLOY_HOOK_URL`. A failing test blocks both deploys.

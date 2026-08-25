@@ -15,7 +15,10 @@ import java.util.UUID;
 public class EmployeeResponseDTO {
 
     private UUID id;
-    private String name;
+    private String firstName;
+    private String lastName;
+    private String email;
+    private String phoneNumber;
     private String photoUrl;
     private UUID businessId;
     private Boolean active;

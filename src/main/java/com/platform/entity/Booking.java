@@ -47,28 +47,26 @@ public class Booking {
     private LocalDateTime updatedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "employee_id", nullable = false)
-    private Employee employee;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "provided_service_id", nullable = false)
-    private ProvidedService providedService;
-
-    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_location_service_price_id", nullable = false)
     private EmployeeLocationServicePrice priceEntry;
-
-
-    @ManyToOne
-    @JoinColumn(name = "location_id")
-    private Location location;
 
     @Embedded
     private Address clientAddress;
 
-
     @OneToOne(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true)
     private Review review;
+
+    public Employee getEmployee() {
+        return priceEntry != null ? priceEntry.getEmployee() : null;
+    }
+
+    public ProvidedService getProvidedService() {
+        return priceEntry != null ? priceEntry.getService() : null;
+    }
+
+    public Location getLocation() {
+        return priceEntry != null ? priceEntry.getLocation() : null;
+    }
 
     @PrePersist
     protected void onCreate() {

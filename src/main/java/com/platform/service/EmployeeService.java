@@ -7,6 +7,7 @@ import com.platform.entity.Employee;
 import com.platform.entity.User;
 import com.platform.exception.BusinessException;
 import com.platform.exception.ResourceNotFoundException;
+import com.platform.repository.BookingRepository;
 import com.platform.repository.BusinessRepository;
 import com.platform.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class EmployeeService {
 
     private final EmployeeRepository employeeRepository;
     private final BusinessRepository businessRepository;
+    private final BookingRepository bookingRepository;
     private final UserService userService;
 
     private static final String BUSINESS_EXCEPTION = "Business not found";
@@ -132,6 +134,9 @@ public class EmployeeService {
 
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException(EMPLOYEE_NOT_FOUND_EXCEPTION));
+
+        List<com.platform.entity.Booking> employeeBookings = bookingRepository.findByEmployeeId(employeeId);
+        bookingRepository.deleteAll(employeeBookings);
 
         employeeRepository.delete(employee);
     }

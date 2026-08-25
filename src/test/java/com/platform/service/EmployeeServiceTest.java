@@ -90,7 +90,10 @@ class EmployeeServiceTest {
         EmployeeResponseDTO response = employeeService.createEmployee(business.getId(), request);
 
         assertNotNull(response);
-        assertEquals(request.getName(), response.getName());
+        assertEquals(request.getFirstName(), response.getFirstName());
+        assertEquals(request.getLastName(), response.getLastName());
+        assertEquals(request.getEmail(), response.getEmail());
+        assertEquals(request.getPhoneNumber(), response.getPhoneNumber());
         assertEquals(request.getPhotoUrl(), response.getPhotoUrl());
         assertTrue(response.getActive());
         verify(employeeRepository).save(any());
@@ -144,7 +147,8 @@ class EmployeeServiceTest {
 
         assertNotNull(response);
         assertEquals(employee.getId(), response.getId());
-        assertEquals(employee.getName(), response.getName());
+        assertEquals(employee.getFirstName(), response.getFirstName());
+        assertEquals(employee.getLastName(), response.getLastName());
     }
 
     @Test
@@ -234,7 +238,8 @@ class EmployeeServiceTest {
         Business business = createBusiness(owner);
         Employee employee = createEmployee(business);
         EmployeeRequestDTO request = createEmployeeRequest();
-        request.setName("Updated Name");
+        request.setFirstName("Updated");
+        request.setLastName("Name");
 
         when(businessRepository.findById(business.getId()))
                 .thenReturn(Optional.of(business));
@@ -249,7 +254,8 @@ class EmployeeServiceTest {
                 business.getId(), employee.getId(), request, owner);
 
         assertNotNull(response);
-        assertEquals("Updated Name", response.getName());
+        assertEquals("Updated", response.getFirstName());
+        assertEquals("Name", response.getLastName());
         verify(employeeRepository).save(any());
     }
 
@@ -382,7 +388,10 @@ class EmployeeServiceTest {
     private Employee createEmployee(Business business) {
         return Employee.builder()
                 .id(UUID.randomUUID())
-                .name("John Doe")
+                .firstName("John")
+                .lastName("Doe")
+                .email("john@example.com")
+                .phoneNumber("+1234567890")
                 .photoUrl("https://example.com/photo.jpg")
                 .active(true)
                 .business(business)
@@ -393,7 +402,10 @@ class EmployeeServiceTest {
 
     private EmployeeRequestDTO createEmployeeRequest() {
         return EmployeeRequestDTO.builder()
-                .name("John Doe")
+                .firstName("John")
+                .lastName("Doe")
+                .email("john@example.com")
+                .phoneNumber("+1234567890")
                 .photoUrl("https://example.com/photo.jpg")
                 .active(true)
                 .build();

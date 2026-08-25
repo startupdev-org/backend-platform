@@ -2,12 +2,14 @@ package com.platform.service;
 
 import com.platform.dto.service.ServiceRequestDTO;
 import com.platform.dto.service.ServiceResponseDTO;
+import com.platform.entity.Booking;
 import com.platform.entity.Business;
 import com.platform.entity.ProvidedService;
 import com.platform.entity.User;
 import com.platform.exception.BusinessException;
 import com.platform.exception.ResourceNotFoundException;
 import com.platform.exception.ServiceNotFoundException;
+import com.platform.repository.BookingRepository;
 import com.platform.repository.BusinessRepository;
 import com.platform.repository.ServiceRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,7 @@ public class ProvidedServicesService {
     private final ServiceRepository serviceRepository;
     private final UserService userService;
     private final BusinessRepository businessRepository;
+    private final BookingRepository bookingRepository;
 
     private static final String SERVICE_EXCEPTION = "Service not found";
 
@@ -128,6 +131,9 @@ public class ProvidedServicesService {
 
         ProvidedService providedService = serviceRepository.findById(serviceId)
                 .orElseThrow(() -> new ResourceNotFoundException(SERVICE_EXCEPTION));
+
+        List<Booking> serviceBookings = bookingRepository.findByProvidedServiceId(serviceId);
+        bookingRepository.deleteAll(serviceBookings);
 
         serviceRepository.delete(providedService);
     }

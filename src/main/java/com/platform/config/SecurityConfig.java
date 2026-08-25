@@ -1,6 +1,8 @@
 package com.platform.config;
 
 import com.platform.security.JwtAuthenticationFilter;
+import com.platform.security.RestAccessDeniedHandler;
+import com.platform.security.RestAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,6 +27,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
+    private final RestAccessDeniedHandler restAccessDeniedHandler;
 
     // ── Role constants ────────────────────────────────────────────────────────
     private static final String ROLE_PLATFORM_ADMIN = "PLATFORM_ADMIN";
@@ -85,7 +89,14 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/business/**")              .hasRole(ROLE_BUSINESS_ADMIN)
 
                         // ── 8. User endpoints ─────────────────────────────────────────
+                        // Self-service lives under /me and /whoami; everything else here is
+                        // admin-only. The trailing default-deny matters: without it a new
+                        // endpoint added to UserController without @PreAuthorize would fall
+                        // through to .anyRequest().authenticated() and be open to every
+                        // logged-in user. First match wins, so ordering is load-bearing.
                         .requestMatchers("/api/users/whoami")                                .authenticated()
+                        .requestMatchers("/api/users/me", "/api/users/me/**")                .authenticated()
+                        .requestMatchers("/api/users/**")            .hasRole(ROLE_PLATFORM_ADMIN)
 
 
                         // ── 9. Booking & Review endpoints ─────────────────────────────
@@ -97,6 +108,11 @@ public class SecurityConfig {
                         // ── 10. Deny everything else ──────────────────────────────────
                         .anyRequest().authenticated()
                 )
+                // Without these Spring falls back to Http403ForbiddenEntryPoint, which is why
+                // an expired token and a genuine role denial used to be the same bodyless 403.
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(restAuthenticationEntryPoint)
+                        .accessDeniedHandler(restAccessDeniedHandler))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

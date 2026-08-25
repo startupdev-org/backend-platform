@@ -18,6 +18,11 @@ public interface BusinessRepository extends JpaRepository<Business, UUID> {
     List<Business> findByBusinessCategory(String category);
     List<Business> findByOwnerId(UUID ownerId);
 
+    // Deterministic ordering: whoami used to index into an unordered result.
+    List<Business> findByOwnerIdOrderByCreatedAtAsc(UUID ownerId);
+
+    boolean existsByOwnerId(UUID ownerId);
+
     @Query("SELECT b FROM Business b WHERE " +
            "LOWER(b.city) LIKE LOWER(CONCAT('%', :city, '%')) AND " +
            "b.ratingOverall >= :minRating")

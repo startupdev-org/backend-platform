@@ -1,28 +1,29 @@
-package com.platform.dto.auth;
+package com.platform.dto.user;
 
-import jakarta.validation.constraints.Email;
+import com.platform.entity.User;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Body for {@code PUT /api/users/{id}}, restricted to PLATFORM_ADMIN.
+ *
+ * <p>Carries no password field: an admin resetting another user's password without their
+ * knowledge is an account-takeover primitive, not an administration feature.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class RegisterRequest {
+@Builder
+public class AdminUserUpdateRequest {
 
-    @Email(message = "Invalid email format")
-    @NotBlank(message = "Email is required")
-    private String email;
+    @NotNull(message = "Role is required")
+    private User.UserRole role;
 
-    @NotBlank(message = "Password is required")
-    @Size(min = 8, message = "Password must be at least 8 characters")
-    private String password;
-
-    // Required here rather than via a NOT NULL column: rows predating these fields have no
-    // real value to backfill, and inventing one would erase the difference between
-    // "never collected" and "left blank".
     @NotBlank(message = "First name is required")
     @Size(max = 100, message = "First name must be at most 100 characters")
     private String firstName;

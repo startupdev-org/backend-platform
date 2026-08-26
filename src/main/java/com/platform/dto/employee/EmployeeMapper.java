@@ -24,7 +24,7 @@ public class EmployeeMapper {
                 .phoneNumber(employee.getPhoneNumber())
                 .photoUrl(employee.getPhotoUrl())
                 .businessId(employee.getBusiness().getId())
-                .active(employee.getActive())
+                .enabled(employee.getEnabled())
                 .createdAt(employee.getCreatedAt())
                 .updatedAt(employee.getUpdatedAt())
                 .build();

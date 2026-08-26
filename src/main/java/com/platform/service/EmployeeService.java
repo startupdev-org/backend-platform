@@ -49,7 +49,7 @@ public class EmployeeService {
                 .email(dto.getEmail())
                 .phoneNumber(dto.getPhoneNumber())
                 .photoUrl(dto.getPhotoUrl())
-                .active(true)
+                .enabled(true)
                 .business(business)
                 .build();
 
@@ -60,13 +60,24 @@ public class EmployeeService {
     public EmployeeResponseDTO getEmployee(UUID id) {
         Employee employee = employeeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(EMPLOYEE_NOT_FOUND_EXCEPTION));
+        if (!Boolean.TRUE.equals(employee.getEnabled())) {
+            throw new ResourceNotFoundException(EMPLOYEE_NOT_FOUND_EXCEPTION);
+        }
+        return toDTO(employee);
+    }
+
+    public EmployeeResponseDTO getEmployeeForAdmin(UUID employeeId, User currentUser) {
+        validatePlatformAdmin(currentUser);
+
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException(EMPLOYEE_NOT_FOUND_EXCEPTION));
         return toDTO(employee);
     }
 
     public List<EmployeeResponseDTO> getBusinessEmployeesList(UUID businessId) {
         List<Employee> employees;
 
-        employees = employeeRepository.findByBusinessId(businessId)
+        employees = employeeRepository.findByBusinessIdAndEnabled(businessId, true)
                 .stream()
                 .toList();
 
@@ -76,7 +87,7 @@ public class EmployeeService {
     public Page<EmployeeResponseDTO> getBusinessEmployees(UUID businessId, Pageable pageable) {
         List<Employee> employees;
 
-        employees = employeeRepository.findByBusinessId(businessId)
+        employees = employeeRepository.findByBusinessIdAndEnabled(businessId, true)
                 .stream()
                 .toList();
 
@@ -87,7 +98,7 @@ public class EmployeeService {
     }
 
     public Page<EmployeeResponseDTO> getActiveEmployees(UUID businessId, Pageable pageable) {
-        List<Employee> employees = employeeRepository.findByBusinessIdAndActive(businessId, true)
+        List<Employee> employees = employeeRepository.findByBusinessIdAndEnabled(businessId, true)
                 .stream()
                 .toList();
 
@@ -108,6 +119,8 @@ public class EmployeeService {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException(EMPLOYEE_NOT_FOUND_EXCEPTION));
 
+        validateEmployeeVisibleToCaller(employee, currentUser);
+
         employee.setFirstName(dto.getFirstName());
         employee.setLastName(dto.getLastName());
         if (dto.getEmail() != null) {
@@ -117,8 +130,8 @@ public class EmployeeService {
             employee.setPhoneNumber(dto.getPhoneNumber());
         }
         employee.setPhotoUrl(dto.getPhotoUrl());
-        if (dto.getActive() != null) {
-            employee.setActive(dto.getActive());
+        if (dto.getEnabled() != null) {
+            employee.setEnabled(dto.getEnabled());
         }
 
         employee = employeeRepository.save(employee);
@@ -131,6 +144,22 @@ public class EmployeeService {
                 .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_EXCEPTION));
 
         validateBusinessOwnership(business, currentUser);
+
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException(EMPLOYEE_NOT_FOUND_EXCEPTION));
+
+        validateEmployeeVisibleToCaller(employee, currentUser);
+
+        employee.setEnabled(false);
+        employeeRepository.save(employee);
+    }
+
+    @Transactional
+    public void hardDeleteEmployee(UUID businessId, UUID employeeId, User currentUser) {
+        validatePlatformAdmin(currentUser);
+
+        businessRepository.findById(businessId)
+                .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_EXCEPTION));
 
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException(EMPLOYEE_NOT_FOUND_EXCEPTION));
@@ -148,6 +177,19 @@ public class EmployeeService {
         }
     }
 
+    private void validateEmployeeVisibleToCaller(Employee employee, User currentUser) {
+        if (!Boolean.TRUE.equals(employee.getEnabled()) &&
+            !currentUser.getRole().equals(User.UserRole.PLATFORM_ADMIN)) {
+            throw new ResourceNotFoundException(EMPLOYEE_NOT_FOUND_EXCEPTION);
+        }
+    }
+
+    private void validatePlatformAdmin(User currentUser) {
+        if (!currentUser.getRole().equals(User.UserRole.PLATFORM_ADMIN)) {
+            throw new BusinessException("Unauthorized");
+        }
+    }
+
     private EmployeeResponseDTO toDTO(Employee employee) {
         return EmployeeResponseDTO.builder()
                 .id(employee.getId())
@@ -157,7 +199,7 @@ public class EmployeeService {
                 .phoneNumber(employee.getPhoneNumber())
                 .photoUrl(employee.getPhotoUrl())
                 .businessId(employee.getBusiness().getId())
-                .active(employee.getActive())
+                .enabled(employee.getEnabled())
                 .createdAt(employee.getCreatedAt())
                 .updatedAt(employee.getUpdatedAt())
                 .build();

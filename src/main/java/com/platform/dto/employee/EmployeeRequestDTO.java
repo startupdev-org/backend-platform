@@ -25,5 +25,5 @@ public class EmployeeRequestDTO {
 
     private String photoUrl;
 
-    private Boolean active;
+    private Boolean enabled;
 }

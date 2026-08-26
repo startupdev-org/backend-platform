@@ -87,6 +87,19 @@ public class SecurityConfig {
                         // ── 6. Service endpoints ──────────────────────────────────────
                         .requestMatchers(HttpMethod.GET,    "/api/business/*/service")       .authenticated()
 
+                        // ── 6b. Location endpoints ────────────────────────────────────
+                        .requestMatchers(HttpMethod.POST,   "/api/business/*/location")      .hasRole(ROLE_BUSINESS_ADMIN)
+                        .requestMatchers(HttpMethod.PUT,    "/api/business/*/location/**")   .hasRole(ROLE_BUSINESS_ADMIN)
+                        .requestMatchers(HttpMethod.DELETE, "/api/business/*/location/**")   .hasRole(ROLE_BUSINESS_ADMIN)
+                        .requestMatchers(HttpMethod.GET,    "/api/business/*/location/**")   .permitAll()
+                        .requestMatchers(HttpMethod.GET,    "/api/business/*/location")      .permitAll()
+
+                        // ── 6c. Employee/location/service pricing endpoints ───────────
+                        .requestMatchers(HttpMethod.POST,   "/api/business/*/employee-service-price")     .hasRole(ROLE_BUSINESS_ADMIN)
+                        .requestMatchers(HttpMethod.PUT,    "/api/business/*/employee-service-price/**")  .hasRole(ROLE_BUSINESS_ADMIN)
+                        .requestMatchers(HttpMethod.DELETE, "/api/business/*/employee-service-price/**")  .hasRole(ROLE_BUSINESS_ADMIN)
+                        .requestMatchers(HttpMethod.GET,    "/api/business/*/employee-service-price/**")  .authenticated()
+
                         // ── 7. General business CRUD (catch-all for /api/business/**) ─
                         .requestMatchers(HttpMethod.GET,    "/api/business/**")              .permitAll()
                         .requestMatchers(HttpMethod.POST,   "/api/business/**")              .hasRole(ROLE_BUSINESS_ADMIN)

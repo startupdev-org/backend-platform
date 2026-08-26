@@ -4,6 +4,9 @@ import com.platform.dto.location.LocationRequestDTO;
 import com.platform.dto.location.LocationResponseDTO;
 import com.platform.entity.Business;
 import com.platform.entity.Location;
+import com.platform.entity.User;
+import com.platform.exception.BusinessException;
+import com.platform.exception.ResourceNotFoundException;
 import com.platform.repository.BusinessRepository;
 import com.platform.repository.LocationRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,12 +21,17 @@ import java.util.stream.Collectors;
 public class LocationService {
 
     private final LocationRepository locationRepository;
-    private final BusinessRepository businessRepository; // to fetch the business
+    private final BusinessRepository businessRepository;
+
+    private static final String BUSINESS_NOT_FOUND = "Business not found";
+    private static final String LOCATION_NOT_FOUND = "Location not found";
 
     // Create a location
-    public LocationResponseDTO createLocation(LocationRequestDTO dto) {
-        Business business = businessRepository.findById(dto.getBusinessId())
-                .orElseThrow(() -> new RuntimeException("Business not found"));
+    public LocationResponseDTO createLocation(UUID businessId, LocationRequestDTO dto, User currentUser) {
+        Business business = businessRepository.findById(businessId)
+                .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_NOT_FOUND));
+
+        validateBusinessOwnership(business, currentUser);
 
         Location location = Location.builder()
                 .business(business)
@@ -40,31 +48,28 @@ public class LocationService {
         return mapToDTO(saved);
     }
 
-    // Get all locations
-    public List<LocationResponseDTO> getAllLocations() {
-        return locationRepository.findAll()
+    // Get all locations for a business
+    public List<LocationResponseDTO> getLocationsForBusiness(UUID businessId) {
+        return locationRepository.findByBusinessId(businessId)
                 .stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
 
-    // Get location by ID
-    public LocationResponseDTO getLocationById(UUID id) {
-        Location location = locationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Location not found"));
+    // Get location by ID, scoped to a business
+    public LocationResponseDTO getLocationById(UUID businessId, UUID locationId) {
+        Location location = getLocationForBusiness(businessId, locationId);
         return mapToDTO(location);
     }
 
     // Update location
-    public LocationResponseDTO updateLocation(UUID id, LocationRequestDTO dto) {
-        Location location = locationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Location not found"));
+    public LocationResponseDTO updateLocation(UUID businessId, UUID locationId, LocationRequestDTO dto, User currentUser) {
+        Business business = businessRepository.findById(businessId)
+                .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_NOT_FOUND));
 
-        if (dto.getBusinessId() != null) {
-            Business business = businessRepository.findById(dto.getBusinessId())
-                    .orElseThrow(() -> new RuntimeException("Business not found"));
-            location.setBusiness(business);
-        }
+        validateBusinessOwnership(business, currentUser);
+
+        Location location = getLocationForBusiness(businessId, locationId);
 
         if (dto.getName() != null) location.setName(dto.getName());
         if (dto.getAddress() != null) location.setAddress(dto.getAddress());
@@ -79,10 +84,32 @@ public class LocationService {
     }
 
     // Delete location
-    public void deleteLocation(UUID id) {
-        Location location = locationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Location not found"));
+    public void deleteLocation(UUID businessId, UUID locationId, User currentUser) {
+        Business business = businessRepository.findById(businessId)
+                .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_NOT_FOUND));
+
+        validateBusinessOwnership(business, currentUser);
+
+        Location location = getLocationForBusiness(businessId, locationId);
         locationRepository.delete(location);
+    }
+
+    private Location getLocationForBusiness(UUID businessId, UUID locationId) {
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new ResourceNotFoundException(LOCATION_NOT_FOUND));
+
+        if (!location.getBusiness().getId().equals(businessId)) {
+            throw new ResourceNotFoundException(LOCATION_NOT_FOUND);
+        }
+
+        return location;
+    }
+
+    private void validateBusinessOwnership(Business business, User currentUser) {
+        if (business.isNotOwner(currentUser) &&
+                !currentUser.getRole().equals(User.UserRole.PLATFORM_ADMIN)) {
+            throw new BusinessException("Unauthorized");
+        }
     }
 
     // Mapper

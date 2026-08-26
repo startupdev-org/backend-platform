@@ -4,6 +4,7 @@ import com.platform.dto.review.ReviewRequestDTO;
 import com.platform.dto.review.ReviewResponseDTO;
 import com.platform.entity.User;
 import com.platform.service.ReviewService;
+import com.platform.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,6 +21,7 @@ import java.util.UUID;
 public class ReviewController {
 
     private final ReviewService reviewService;
+    private final UserService userService;
 
     @PostMapping("/booking/{bookingId}")
     public ResponseEntity<ReviewResponseDTO> createReview(
@@ -46,7 +48,7 @@ public class ReviewController {
             @PathVariable UUID id,
             @RequestParam String reply,
             Authentication authentication) {
-        User currentUser = (User) authentication.getPrincipal();
+        User currentUser = userService.getUserByUsername(authentication.getName());
         ReviewResponseDTO review = reviewService.addBusinessReply(id, reply, currentUser);
         return ResponseEntity.ok(review);
     }

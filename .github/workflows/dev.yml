@@ -51,4 +51,6 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
 
       - name: Deploy on Northflank
-        run: curl --fail --silent --show-error "$NORTHFLANK_WEBHOOK_URL"
+        run: |
+          echo "Webhook URL is configured: $([[ -n "$NORTHFLANK_WEBHOOK_URL" ]] && echo yes || echo no)"
+          curl -v --fail "$NORTHFLANK_WEBHOOK_URL"

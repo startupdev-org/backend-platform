@@ -109,7 +109,7 @@ public class UserService {
         List<ProvidedService> services = businessIds.isEmpty()
                 ? List.of() : serviceRepository.findByBusinessIdIn(businessIds);
         List<Employee> employees = businessIds.isEmpty()
-                ? List.of() : employeeRepository.findByBusinessIdIn(businessIds);
+                ? List.of() : employeeRepository.findByBusinessIdInAndEnabled(businessIds, true);
 
         // DTOs, never entities: entities would carry the password hash and let Jackson walk
         // lazy associations outside the transaction.

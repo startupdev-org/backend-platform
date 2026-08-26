@@ -1,56 +1,50 @@
-name: Build and deploy (dev)
+  name: Build and deploy (dev)
 
-on:
-  push:
-    branches:
-      - dev
+  on:
+    push:
+      branches:
+        - dev
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  env:
+    REGISTRY: ghcr.io
+    IMAGE_NAME: ${{ github.repository }}
+    DEPLOY_URL: ${{ var.RENDER_DEPLOY_HOOK_URL }}
 
-jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
+  jobs:
+    build-and-push:
+      runs-on: ubuntu-latest
+      environment: dev
+      permissions:
+        contents: read
+        packages: write
 
-    environment: dev
+      steps:
+        - name: Checkout repo
+          uses: actions/checkout@v4
 
-    env:
-      NORTHFLANK_WEBHOOK_URL: ${{ vars.NORTHFLANK_WEBHOOK_URL }}
+        - name: Setup JDK
+          uses: actions/setup-java@v4
+          with:
+            java-version: '17'
+            distribution: 'temurin'
+            cache: maven
 
-    permissions:
-      contents: read
-      packages: write
+        - name: Run tests
+          run: mvn -B test
 
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+        - name: Login to GHCR
+          uses: docker/login-action@v3
+          with:
+            registry: ${{ env.REGISTRY }}
+            username: ${{ github.actor }}
+            password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup JDK
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: temurin
-          cache: maven
+        - name: Build and push Docker image
+          uses: docker/build-push-action@v5
+          with:
+            context: .
+            push: true
+            tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
 
-      - name: Run tests
-        run: mvn -B test
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
-
-      - name: Deploy on Northflank
-        run: |
-          curl --fail --silent --show-error \
-            "$NORTHFLANK_WEBHOOK_URL"
+        - name: Deploy on Render
+          run: curl --fail --silent --show-error "$DEPLOY_URL"

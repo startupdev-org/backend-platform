@@ -37,7 +37,7 @@ public class Employee {
     private String photoUrl;
 
     @Column(nullable = false)
-    private Boolean active;
+    private Boolean enabled;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -53,7 +53,7 @@ public class Employee {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
-        this.active = true;
+        this.enabled = true;
     }
 
     @PreUpdate

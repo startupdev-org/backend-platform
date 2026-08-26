@@ -11,8 +11,7 @@ import java.util.UUID;
 
 @Repository
 public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
-    List<Employee> findByBusinessId(UUID businessId);
+    List<Employee> findByBusinessIdAndEnabled(UUID businessId, Boolean enabled);
 
-    List<Employee> findByBusinessIdIn(Collection<UUID> businessIds);
-    List<Employee> findByBusinessIdAndActive(UUID businessId, Boolean active);
+    List<Employee> findByBusinessIdInAndEnabled(Collection<UUID> businessIds, Boolean enabled);
 }

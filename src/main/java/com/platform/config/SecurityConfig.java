@@ -64,7 +64,11 @@ public class SecurityConfig {
                         // ── 3. Employee endpoints ─────────────────────────────────────
                         // Write operations → BUSINESS_ADMIN only
                         .requestMatchers(HttpMethod.POST,   "/api/business/*/employee")      .hasRole(ROLE_BUSINESS_ADMIN)
-                        .requestMatchers(HttpMethod.PUT,    "/api/business/*/employee/**")   .hasRole(ROLE_BUSINESS_ADMIN)
+                        .requestMatchers(HttpMethod.PUT,    "/api/business/*/employee/**")   .hasAnyRole(ROLE_BUSINESS_ADMIN, ROLE_PLATFORM_ADMIN)
+                        // Platform-admin-only: permanent delete and disabled-employee lookup
+                        // (must precede the general DELETE/GET employee rules below — first match wins)
+                        .requestMatchers(HttpMethod.DELETE, "/api/business/*/employee/*/permanent") .hasRole(ROLE_PLATFORM_ADMIN)
+                        .requestMatchers(HttpMethod.GET,    "/api/business/*/employee/*/admin")     .hasRole(ROLE_PLATFORM_ADMIN)
                         .requestMatchers(HttpMethod.DELETE, "/api/business/*/employee/**")   .hasRole(ROLE_BUSINESS_ADMIN)
                         // Read operations → any authenticated user
                         .requestMatchers(HttpMethod.GET,    "/api/business/*/employee/**")   .permitAll()

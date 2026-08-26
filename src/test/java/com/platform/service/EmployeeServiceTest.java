@@ -99,7 +99,7 @@ class EmployeeServiceTest {
         assertEquals(request.getEmail(), response.getEmail());
         assertEquals(request.getPhoneNumber(), response.getPhoneNumber());
         assertEquals(request.getPhotoUrl(), response.getPhotoUrl());
-        assertTrue(response.getActive());
+        assertTrue(response.getEnabled());
         verify(employeeRepository).save(any());
     }
 
@@ -166,6 +166,50 @@ class EmployeeServiceTest {
                 () -> employeeService.getEmployee(employeeId));
     }
 
+    @Test
+    void getEmployee_disabled_throwsNotFound() {
+        User owner = createBusinessOwner();
+        Business business = createBusiness(owner);
+        Employee employee = createEmployee(business);
+        employee.setEnabled(false);
+
+        when(employeeRepository.findById(employee.getId()))
+                .thenReturn(Optional.of(employee));
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> employeeService.getEmployee(employee.getId()));
+    }
+
+    // ==================== getEmployeeForAdmin ====================
+
+    @Test
+    void getEmployeeForAdmin_disabledEmployee_visibleToPlatformAdmin() {
+        User owner = createBusinessOwner();
+        User platformAdmin = createPlatformAdmin();
+        Business business = createBusiness(owner);
+        Employee employee = createEmployee(business);
+        employee.setEnabled(false);
+
+        when(employeeRepository.findById(employee.getId()))
+                .thenReturn(Optional.of(employee));
+
+        EmployeeResponseDTO response = employeeService.getEmployeeForAdmin(employee.getId(), platformAdmin);
+
+        assertNotNull(response);
+        assertFalse(response.getEnabled());
+    }
+
+    @Test
+    void getEmployeeForAdmin_notPlatformAdmin_throwsBusinessException() {
+        User owner = createBusinessOwner();
+        UUID employeeId = UUID.randomUUID();
+
+        assertThrows(BusinessException.class,
+                () -> employeeService.getEmployeeForAdmin(employeeId, owner));
+
+        verify(employeeRepository, never()).findById(any());
+    }
+
     // ==================== getBusinessEmployeesList ====================
 
     @Test
@@ -174,7 +218,7 @@ class EmployeeServiceTest {
         Business business = createBusiness(owner);
         Employee employee = createEmployee(business);
 
-        when(employeeRepository.findByBusinessId(business.getId()))
+        when(employeeRepository.findByBusinessIdAndEnabled(business.getId(), true))
                 .thenReturn(List.of(employee));
 
         List<EmployeeResponseDTO> response = employeeService.getBusinessEmployeesList(business.getId());
@@ -188,7 +232,7 @@ class EmployeeServiceTest {
     void getBusinessEmployeesList_empty() {
         UUID businessId = UUID.randomUUID();
 
-        when(employeeRepository.findByBusinessId(businessId))
+        when(employeeRepository.findByBusinessIdAndEnabled(businessId, true))
                 .thenReturn(List.of());
 
         List<EmployeeResponseDTO> response = employeeService.getBusinessEmployeesList(businessId);
@@ -205,7 +249,7 @@ class EmployeeServiceTest {
         Business business = createBusiness(owner);
         Employee employee = createEmployee(business);
 
-        when(employeeRepository.findByBusinessId(business.getId()))
+        when(employeeRepository.findByBusinessIdAndEnabled(business.getId(), true))
                 .thenReturn(List.of(employee));
 
         Page<EmployeeResponseDTO> page = employeeService.getBusinessEmployees(
@@ -223,7 +267,7 @@ class EmployeeServiceTest {
         Business business = createBusiness(owner);
         Employee employee = createEmployee(business);
 
-        when(employeeRepository.findByBusinessIdAndActive(business.getId(), true))
+        when(employeeRepository.findByBusinessIdAndEnabled(business.getId(), true))
                 .thenReturn(List.of(employee));
 
         Page<EmployeeResponseDTO> page = employeeService.getActiveEmployees(
@@ -231,7 +275,7 @@ class EmployeeServiceTest {
 
         assertNotNull(page);
         assertEquals(1, page.getContent().size());
-        assertTrue(page.getContent().get(0).getActive());
+        assertTrue(page.getContent().get(0).getEnabled());
     }
 
     // ==================== updateEmployee ====================
@@ -296,10 +340,55 @@ class EmployeeServiceTest {
         verify(employeeRepository, never()).save(any());
     }
 
-    // ==================== deleteEmployee ====================
+    @Test
+    void updateEmployee_disabledEmployee_businessAdmin_throwsNotFound() {
+        User owner = createBusinessOwner();
+        Business business = createBusiness(owner);
+        Employee employee = createEmployee(business);
+        employee.setEnabled(false);
+        EmployeeRequestDTO request = createEmployeeRequest();
+
+        when(businessRepository.findById(business.getId()))
+                .thenReturn(Optional.of(business));
+
+        when(employeeRepository.findById(employee.getId()))
+                .thenReturn(Optional.of(employee));
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> employeeService.updateEmployee(business.getId(), employee.getId(), request, owner));
+
+        verify(employeeRepository, never()).save(any());
+    }
 
     @Test
-    void deleteEmployee_success() {
+    void updateEmployee_disabledEmployee_platformAdmin_canReenable() {
+        User owner = createBusinessOwner();
+        User platformAdmin = createPlatformAdmin();
+        Business business = createBusiness(owner);
+        Employee employee = createEmployee(business);
+        employee.setEnabled(false);
+        EmployeeRequestDTO request = createEmployeeRequest();
+        request.setEnabled(true);
+
+        when(businessRepository.findById(business.getId()))
+                .thenReturn(Optional.of(business));
+
+        when(employeeRepository.findById(employee.getId()))
+                .thenReturn(Optional.of(employee));
+
+        when(employeeRepository.save(any()))
+                .thenAnswer(i -> i.getArgument(0));
+
+        EmployeeResponseDTO response = employeeService.updateEmployee(
+                business.getId(), employee.getId(), request, platformAdmin);
+
+        assertTrue(response.getEnabled());
+    }
+
+    // ==================== deleteEmployee (soft delete) ====================
+
+    @Test
+    void deleteEmployee_success_softDeletesWithoutTouchingBookings() {
         User owner = createBusinessOwner();
         Business business = createBusiness(owner);
         Employee employee = createEmployee(business);
@@ -310,14 +399,15 @@ class EmployeeServiceTest {
         when(employeeRepository.findById(employee.getId()))
                 .thenReturn(Optional.of(employee));
 
-        when(bookingRepository.findByEmployeeId(employee.getId()))
-                .thenReturn(new ArrayList<>());
+        when(employeeRepository.save(any()))
+                .thenAnswer(i -> i.getArgument(0));
 
         employeeService.deleteEmployee(business.getId(), employee.getId(), owner);
 
-        verify(bookingRepository).findByEmployeeId(employee.getId());
-        verify(bookingRepository).deleteAll(new ArrayList<>());
-        verify(employeeRepository).delete(employee);
+        assertFalse(employee.getEnabled());
+        verify(employeeRepository).save(employee);
+        verify(employeeRepository, never()).delete(any());
+        verifyNoInteractions(bookingRepository);
     }
 
     @Test
@@ -332,7 +422,7 @@ class EmployeeServiceTest {
         assertThrows(ResourceNotFoundException.class,
                 () -> employeeService.deleteEmployee(businessId, employeeId, owner));
 
-        verify(employeeRepository, never()).delete(any());
+        verify(employeeRepository, never()).save(any());
     }
 
     @Test
@@ -348,7 +438,64 @@ class EmployeeServiceTest {
         assertThrows(BusinessException.class,
                 () -> employeeService.deleteEmployee(business.getId(), employeeId, otherUser));
 
+        verify(employeeRepository, never()).save(any());
+    }
+
+    @Test
+    void deleteEmployee_alreadyDisabled_throwsNotFound() {
+        User owner = createBusinessOwner();
+        Business business = createBusiness(owner);
+        Employee employee = createEmployee(business);
+        employee.setEnabled(false);
+
+        when(businessRepository.findById(business.getId()))
+                .thenReturn(Optional.of(business));
+
+        when(employeeRepository.findById(employee.getId()))
+                .thenReturn(Optional.of(employee));
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> employeeService.deleteEmployee(business.getId(), employee.getId(), owner));
+
+        verify(employeeRepository, never()).save(any());
+    }
+
+    // ==================== hardDeleteEmployee ====================
+
+    @Test
+    void hardDeleteEmployee_platformAdmin_deletesEmployeeAndBookings() {
+        User owner = createBusinessOwner();
+        User platformAdmin = createPlatformAdmin();
+        Business business = createBusiness(owner);
+        Employee employee = createEmployee(business);
+
+        when(businessRepository.findById(business.getId()))
+                .thenReturn(Optional.of(business));
+
+        when(employeeRepository.findById(employee.getId()))
+                .thenReturn(Optional.of(employee));
+
+        when(bookingRepository.findByEmployeeId(employee.getId()))
+                .thenReturn(new ArrayList<>());
+
+        employeeService.hardDeleteEmployee(business.getId(), employee.getId(), platformAdmin);
+
+        verify(bookingRepository).findByEmployeeId(employee.getId());
+        verify(bookingRepository).deleteAll(new ArrayList<>());
+        verify(employeeRepository).delete(employee);
+    }
+
+    @Test
+    void hardDeleteEmployee_notPlatformAdmin_throwsBusinessException() {
+        User owner = createBusinessOwner();
+        UUID businessId = UUID.randomUUID();
+        UUID employeeId = UUID.randomUUID();
+
+        assertThrows(BusinessException.class,
+                () -> employeeService.hardDeleteEmployee(businessId, employeeId, owner));
+
         verify(employeeRepository, never()).delete(any());
+        verifyNoInteractions(businessRepository, bookingRepository);
     }
 
     // ==================== Helpers ====================
@@ -368,6 +515,16 @@ class EmployeeServiceTest {
                 .id(UUID.randomUUID())
                 .email("other@gmail.com")
                 .role(User.UserRole.BUSINESS_ADMIN)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+    }
+
+    private User createPlatformAdmin() {
+        return User.builder()
+                .id(UUID.randomUUID())
+                .email("admin@gmail.com")
+                .role(User.UserRole.PLATFORM_ADMIN)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
@@ -402,7 +559,7 @@ class EmployeeServiceTest {
                 .email("john@example.com")
                 .phoneNumber("+1234567890")
                 .photoUrl("https://example.com/photo.jpg")
-                .active(true)
+                .enabled(true)
                 .business(business)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -416,7 +573,7 @@ class EmployeeServiceTest {
                 .email("john@example.com")
                 .phoneNumber("+1234567890")
                 .photoUrl("https://example.com/photo.jpg")
-                .active(true)
+                .enabled(true)
                 .build();
     }
 }

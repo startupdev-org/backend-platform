@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class AppController {
 
-    private AppConfig appConfig;
+    private final AppConfig appConfig;
 
     /**
      * Endpoint to show configuration properties.

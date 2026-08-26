@@ -11,7 +11,10 @@ import com.platform.dto.business.CreateWorkingHoursRequest;
 import com.platform.entity.Business;
 import com.platform.entity.BusinessWorkingHours;
 import com.platform.entity.User;
+import com.platform.exception.BadRequestException;
 import com.platform.exception.BusinessException;
+import com.platform.exception.ConflictException;
+import com.platform.exception.ResourceNotFoundException;
 import com.platform.repository.BusinessRepository;
 import com.platform.repository.BusinessWorkingHoursRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -86,7 +89,7 @@ class BusinessWorkingHoursServiceTest {
         request.setOpenTime(LocalTime.of(18, 0));
         request.setCloseTime(LocalTime.of(9, 0));
 
-        Exception exception = assertThrows(IllegalArgumentException.class, () ->
+        Exception exception = assertThrows(BadRequestException.class, () ->
                 service.create(business.getId(), request)
         );
 
@@ -112,11 +115,27 @@ class BusinessWorkingHoursServiceTest {
                 business.getId(), DayOfWeek.WEDNESDAY))
                 .thenReturn(List.of(existing));
 
-        Exception exception = assertThrows(IllegalArgumentException.class, () ->
+        Exception exception = assertThrows(ConflictException.class, () ->
                 service.create(business.getId(), request)
         );
 
         assertEquals("Working hours overlap with existing interval", exception.getMessage());
+    }
+
+    @Test
+    void create_businessNotFound_throwsNotFound() {
+        CreateWorkingHoursRequest request = new CreateWorkingHoursRequest();
+        request.setDayOfWeek(DayOfWeek.MONDAY);
+        request.setOpenTime(LocalTime.of(9, 0));
+        request.setCloseTime(LocalTime.of(17, 0));
+
+        when(businessRepository.findById(business.getId())).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () ->
+                service.create(business.getId(), request)
+        );
+
+        verify(workingHoursRepository, never()).save(any());
     }
 
     @Test
@@ -163,6 +182,22 @@ class BusinessWorkingHoursServiceTest {
     }
 
     @Test
+    void update_workingHoursNotFound_throwsNotFound() {
+        CreateWorkingHoursRequest request = new CreateWorkingHoursRequest();
+        request.setDayOfWeek(DayOfWeek.MONDAY);
+        request.setOpenTime(LocalTime.of(9, 0));
+        request.setCloseTime(LocalTime.of(17, 0));
+
+        when(workingHoursRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () ->
+                service.update(business.getId(), 1L, request)
+        );
+
+        verify(workingHoursRepository, never()).save(any());
+    }
+
+    @Test
     void delete_shouldRemoveWorkingHours() {
         BusinessWorkingHours existing = new BusinessWorkingHours(
                 business, DayOfWeek.FRIDAY,
@@ -187,5 +222,16 @@ class BusinessWorkingHoursServiceTest {
         when(workingHoursRepository.findById(1L)).thenReturn(Optional.of(existing));
 
         assertThrows(BusinessException.class, () -> service.delete(business.getId(), 1L));
+    }
+
+    @Test
+    void delete_workingHoursNotFound_throwsNotFound() {
+        when(workingHoursRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () ->
+                service.delete(business.getId(), 1L)
+        );
+
+        verify(workingHoursRepository, never()).delete(any());
     }
 }

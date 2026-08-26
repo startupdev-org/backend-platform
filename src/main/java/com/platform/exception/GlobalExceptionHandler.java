@@ -166,6 +166,18 @@ public class GlobalExceptionHandler {
                 "Method not supported for this endpoint", request);
     }
 
+    // ── 502 ───────────────────────────────────────────────────────────────────
+
+    // The object store failing is an upstream problem, not an application bug, so it
+    // must not land in the catch-all below as a 500 with a stack trace. The message is
+    // a constant - the provider's own error text can carry bucket names and tokens.
+    @ExceptionHandler(StorageException.class)
+    public ResponseEntity<ErrorResponse> handleStorageFailure(
+            StorageException ex, WebRequest request) {
+        log.warn("Storage provider failure at {}: {}", path(request), ex.getMessage());
+        return build(HttpStatus.BAD_GATEWAY, "Image storage is temporarily unavailable", request);
+    }
+
     // ── 500 ───────────────────────────────────────────────────────────────────
 
     @ExceptionHandler(Exception.class)

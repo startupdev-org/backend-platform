@@ -48,9 +48,10 @@ public class Business {
 
     private String website;
 
-    private String logoUrl;
+    // Object-storage key, not a URL. See com.platform.storage.ImageKeys.
+    private String logoKey;
 
-    private String coverImageUrl;
+    private String coverImageKey;
 
     @Column(columnDefinition = "NUMERIC(3,2) DEFAULT 0")
     private Double ratingOverall;

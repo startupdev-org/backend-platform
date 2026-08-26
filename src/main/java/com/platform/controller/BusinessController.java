@@ -4,6 +4,7 @@ import com.platform.dto.business.BusinessRequestDTO;
 import com.platform.dto.business.BusinessResponseDTO;
 import com.platform.entity.User;
 import com.platform.service.BusinessService;
+import com.platform.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -29,6 +30,7 @@ import java.util.UUID;
 public class BusinessController {
 
     private final BusinessService businessService;
+    private final UserService userService;
 
     @Operation(summary = "List businesses", description = "Returns a paginated list of businesses, optionally filtered by city and minimum rating")
     @ApiResponse(responseCode = "200", description = "Businesses retrieved successfully")
@@ -116,7 +118,7 @@ public class BusinessController {
             @Parameter(description = "Business UUID")
             @PathVariable UUID id,
             Authentication authentication) {
-        User currentUser = (User) authentication.getPrincipal();
+        User currentUser = userService.getUserByUsername(authentication.getName());
         businessService.deleteBusiness(id, currentUser);
         return ResponseEntity.noContent().build();
     }
@@ -126,7 +128,7 @@ public class BusinessController {
     @ApiResponse(responseCode = "403", description = "Not authenticated")
     @GetMapping("/user/my-businesses")
     public ResponseEntity<List<BusinessResponseDTO>> getUserBusinesses(Authentication authentication) {
-        User currentUser = (User) authentication.getPrincipal();
+        User currentUser = userService.getUserByUsername(authentication.getName());
         List<BusinessResponseDTO> businesses = businessService.getUserBusinesses(currentUser.getId());
         return ResponseEntity.ok(businesses);
     }

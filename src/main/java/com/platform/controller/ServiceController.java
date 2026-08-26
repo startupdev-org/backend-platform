@@ -4,6 +4,7 @@ import com.platform.dto.service.ServiceRequestDTO;
 import com.platform.dto.service.ServiceResponseDTO;
 import com.platform.entity.User;
 import com.platform.service.ProvidedServicesService;
+import com.platform.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -29,6 +30,7 @@ import java.util.UUID;
 public class ServiceController {
 
     private final ProvidedServicesService providedServicesService;
+    private final UserService userService;
 
     @Operation(summary = "Create a service", description = "Creates a new service for the specified business")
     @ApiResponse(responseCode = "201", description = "Service created successfully")
@@ -108,7 +110,7 @@ public class ServiceController {
             @Parameter(description = "Service UUID", example = "123e4567-e89b-12d3-a456-426614174000")
             @PathVariable UUID serviceId,
             Authentication authentication) {
-        User currentUser = (User) authentication.getPrincipal();
+        User currentUser = userService.getUserByUsername(authentication.getName());
         providedServicesService.deleteService(businessId, serviceId, currentUser);
         return ResponseEntity.noContent().build();
     }

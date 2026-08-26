@@ -34,7 +34,8 @@ public class Employee {
 
     private String phoneNumber;
 
-    private String photoUrl;
+    // Object-storage key, not a URL. See com.platform.storage.ImageKeys.
+    private String photoKey;
 
     @Column(nullable = false)
     private Boolean enabled;

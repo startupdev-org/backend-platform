@@ -10,6 +10,7 @@ import com.platform.exception.ResourceNotFoundException;
 import com.platform.repository.BookingRepository;
 import com.platform.repository.BusinessRepository;
 import com.platform.repository.EmployeeRepository;
+import com.platform.storage.ImageUrlResolver;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,9 @@ class EmployeeServiceTest {
 
     @Mock
     private UserService userService;
+
+    @Mock
+    private ImageUrlResolver imageUrls;
 
     @InjectMocks
     private EmployeeService employeeService;
@@ -98,7 +102,8 @@ class EmployeeServiceTest {
         assertEquals(request.getLastName(), response.getLastName());
         assertEquals(request.getEmail(), response.getEmail());
         assertEquals(request.getPhoneNumber(), response.getPhoneNumber());
-        assertEquals(request.getPhotoUrl(), response.getPhotoUrl());
+        // Photos are not settable through create - they come from the image endpoints.
+        assertNull(response.getPhotoUrl());
         assertTrue(response.getEnabled());
         verify(employeeRepository).save(any());
     }
@@ -558,7 +563,7 @@ class EmployeeServiceTest {
                 .lastName("Doe")
                 .email("john@example.com")
                 .phoneNumber("+1234567890")
-                .photoUrl("https://example.com/photo.jpg")
+                .photoKey("business/1/employee/1/photo/abc.jpg")
                 .enabled(true)
                 .business(business)
                 .createdAt(LocalDateTime.now())
@@ -572,7 +577,6 @@ class EmployeeServiceTest {
                 .lastName("Doe")
                 .email("john@example.com")
                 .phoneNumber("+1234567890")
-                .photoUrl("https://example.com/photo.jpg")
                 .enabled(true)
                 .build();
     }

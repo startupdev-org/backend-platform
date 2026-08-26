@@ -61,6 +61,17 @@ public class SecurityConfig {
                         // ── 2. Platform admin (most privileged — checked early) ────────
                         .requestMatchers("/api/business/admin/**").hasRole(ROLE_PLATFORM_ADMIN)
 
+                        // ── 2b. Image upload endpoints ────────────────────────────────
+                        // Must precede both the employee rules below and the /api/business/**
+                        // catch-all in section 7 - first match wins, and the catch-all would
+                        // otherwise lock PLATFORM_ADMIN out of these.
+                        .requestMatchers(HttpMethod.POST,   "/api/business/*/images/upload-url")           .hasAnyRole(ROLE_BUSINESS_ADMIN, ROLE_PLATFORM_ADMIN)
+                        .requestMatchers(HttpMethod.PUT,    "/api/business/*/images")                      .hasAnyRole(ROLE_BUSINESS_ADMIN, ROLE_PLATFORM_ADMIN)
+                        .requestMatchers(HttpMethod.DELETE, "/api/business/*/images")                      .hasAnyRole(ROLE_BUSINESS_ADMIN, ROLE_PLATFORM_ADMIN)
+                        .requestMatchers(HttpMethod.POST,   "/api/business/*/employee/*/images/upload-url").hasAnyRole(ROLE_BUSINESS_ADMIN, ROLE_PLATFORM_ADMIN)
+                        .requestMatchers(HttpMethod.PUT,    "/api/business/*/employee/*/images")           .hasAnyRole(ROLE_BUSINESS_ADMIN, ROLE_PLATFORM_ADMIN)
+                        .requestMatchers(HttpMethod.DELETE, "/api/business/*/employee/*/images")           .hasAnyRole(ROLE_BUSINESS_ADMIN, ROLE_PLATFORM_ADMIN)
+
                         // ── 3. Employee endpoints ─────────────────────────────────────
                         // Write operations → BUSINESS_ADMIN only
                         .requestMatchers(HttpMethod.POST,   "/api/business/*/employee")      .hasRole(ROLE_BUSINESS_ADMIN)

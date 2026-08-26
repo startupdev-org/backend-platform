@@ -12,6 +12,7 @@ import com.platform.entity.User;
 import com.platform.exception.BusinessException;
 import com.platform.exception.ResourceNotFoundException;
 import com.platform.repository.BusinessRepository;
+import com.platform.storage.ImageUrlResolver;
 import com.platform.utils.SlugGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -35,6 +36,7 @@ public class BusinessService {
     private final EmployeeService employeeService;
     private final FeatureService featureService;
     private final LocationService locationService;
+    private final ImageUrlResolver imageUrls;
 
     private static final String BUSINESS_EXCEPTION = "Business not found";
 
@@ -55,8 +57,6 @@ public class BusinessService {
                 .city(dto.getCity())
                 .phone(dto.getPhone())
                 .website(dto.getWebsite())
-                .logoUrl(dto.getLogoUrl())
-                .coverImageUrl(dto.getCoverImageUrl())
                 .owner(owner)
                 .build();
 
@@ -117,8 +117,6 @@ public class BusinessService {
         business.setCity(dto.getCity());
         business.setPhone(dto.getPhone());
         business.setWebsite(dto.getWebsite());
-        business.setLogoUrl(dto.getLogoUrl());
-        business.setCoverImageUrl(dto.getCoverImageUrl());
 
         business = businessRepository.save(business);
         return toDTO(business);
@@ -151,7 +149,7 @@ public class BusinessService {
         Set<BusinessFeatureDTO> featureList = featureService.getAllFeatures(business.getId());
         List<LocationResponseDTO> locationList = locationService.getLocationsForBusiness(business.getId());
 
-        return BusinessMapper.toDTO(business, businessServices, employeeList, featureList, locationList, owner);
+        return BusinessMapper.toDTO(business, businessServices, employeeList, featureList, locationList, owner, imageUrls);
     }
 
     private User getUser() {

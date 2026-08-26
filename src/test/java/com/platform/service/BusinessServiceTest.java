@@ -18,6 +18,7 @@ import com.platform.dto.business.BusinessRequestDTO;
 import com.platform.dto.business.BusinessResponseDTO;
 import com.platform.exception.BusinessException;
 import com.platform.exception.ResourceNotFoundException;
+import com.platform.storage.ImageUrlResolver;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
@@ -55,6 +56,9 @@ class BusinessServiceTest {
 
     @Mock
     private FeatureService featureService;
+
+    @Mock
+    private ImageUrlResolver imageUrls;
 
     private static final String TEST_EMAIL = "test@gmail.com";
 
@@ -100,8 +104,6 @@ class BusinessServiceTest {
                 .city("Chisinau")
                 .phone("123")
                 .website("site")
-                .logoUrl("logo")
-                .coverImageUrl("cover")
                 .build();
     }
 

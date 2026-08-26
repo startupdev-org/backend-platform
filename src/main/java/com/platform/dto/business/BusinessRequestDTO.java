@@ -33,9 +33,7 @@ public class BusinessRequestDTO {
     @Nullable
     private String website;
 
-    @Nullable
-    private String logoUrl;
-
-    @Nullable
-    private String coverImageUrl;
+    // No image fields here on purpose. Logo and cover change only through
+    // /api/business/{id}/images, so a client cannot point them at an arbitrary URL -
+    // and an update payload that omits them can no longer wipe them.
 }

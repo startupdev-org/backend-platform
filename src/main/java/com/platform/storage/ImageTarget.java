@@ -1,6 +1,6 @@
 package com.platform.storage;
 
-/** Which image slot an upload is destined for. Also the folder segment in the key. */
+/** Which image slot an upload is destined for. Also, the folder segment in the key. */
 public enum ImageTarget {
 
     LOGO("logo"),

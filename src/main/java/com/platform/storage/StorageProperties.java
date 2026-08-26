@@ -9,8 +9,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "storage")
 public class StorageProperties {
 
-    /** Selects the {@link StorageProvider} implementation. Currently only "supabase". */
-    private String provider = "supabase";
+    /** Selects the {@link StorageProvider} implementation. Currently only "r2". */
+    private String provider = "r2";
 
     private String bucket;
 
@@ -23,12 +23,16 @@ public class StorageProperties {
      */
     private long maxUploadBytes = 5L * 1024 * 1024;
 
-    private final Supabase supabase = new Supabase();
+    private final R2 r2 = new R2();
 
     @Getter
     @Setter
-    public static class Supabase {
-        private String url;
-        private String serviceKey;
+    public static class R2 {
+        private String accountId;
+        private String accessKeyId;
+        private String secretAccessKey;
+
+        /** Base URL objects are served from, e.g. the bucket's pub-&lt;hash&gt;.r2.dev subdomain. */
+        private String publicUrlBase;
     }
 }

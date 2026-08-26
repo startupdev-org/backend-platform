@@ -2,27 +2,49 @@ package com.platform.config;
 
 import com.platform.storage.StorageProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.client.RestTemplate;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
-import java.time.Duration;
+import java.net.URI;
 
 @Configuration
 @EnableConfigurationProperties(StorageProperties.class)
 public class StorageConfig {
 
     /**
-     * Timeouts are not optional here. Without them a hung storage provider holds a
-     * request thread open indefinitely, which on a single small instance is enough to
-     * take the whole API down - the RestTemplate this replaces had no timeouts at all.
+     * R2 speaks the S3 API but is not AWS - "auto" is the region R2 expects, and the
+     * endpoint is overridden to the account's R2 endpoint instead of an AWS region endpoint.
      */
     @Bean
-    public RestTemplate storageRestTemplate(RestTemplateBuilder builder) {
-        return builder
-                .setConnectTimeout(Duration.ofSeconds(5))
-                .setReadTimeout(Duration.ofSeconds(10))
+    public S3Client r2Client(StorageProperties properties) {
+        return S3Client.builder()
+                .region(Region.of("auto"))
+                .endpointOverride(r2Endpoint(properties))
+                .credentialsProvider(credentialsProvider(properties))
                 .build();
+    }
+
+    @Bean
+    public S3Presigner r2Presigner(StorageProperties properties) {
+        return S3Presigner.builder()
+                .region(Region.of("auto"))
+                .endpointOverride(r2Endpoint(properties))
+                .credentialsProvider(credentialsProvider(properties))
+                .build();
+    }
+
+    private URI r2Endpoint(StorageProperties properties) {
+        return URI.create("https://" + properties.getR2().getAccountId() + ".r2.cloudflarestorage.com");
+    }
+
+    private StaticCredentialsProvider credentialsProvider(StorageProperties properties) {
+        return StaticCredentialsProvider.create(AwsBasicCredentials.create(
+                properties.getR2().getAccessKeyId(),
+                properties.getR2().getSecretAccessKey()));
     }
 }

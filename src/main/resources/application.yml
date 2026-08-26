@@ -50,18 +50,20 @@ server:
 cors:
   allowed-origins: ${ALLOWED_ORIGINS}
 
-# Object storage for business logos, covers, and employee photos.
+# Object storage (Cloudflare R2) for business logos, covers, and employee photos.
 # Uploads go browser-to-bucket through a presigned URL - no image bytes pass through
 # this service - so max-upload-bytes is advisory. The enforceable limit is the bucket's
 # own file_size_limit, and the bucket's CORS rules must allow PUT from the app origins.
 storage:
-  provider: supabase
-  bucket: ${STORAGE_BUCKET:business-assets}
+  provider: r2
+  bucket: ${STORAGE_BUCKET}
   signed-url-ttl-seconds: 60
   max-upload-bytes: 5242880
-  supabase:
-    url: ${SUPABASE_URL:}
-    service-key: ${SUPABASE_SERVICE_KEY:}
+  r2:
+    account-id: ${R2_ACCOUNT_ID:}
+    access-key-id: ${R2_ACCESS_KEY_ID:}
+    secret-access-key: ${R2_SECRET_ACCESS_KEY:}
+    public-url-base: ${R2_PUBLIC_URL_BASE:}
 
 logging:
   level:

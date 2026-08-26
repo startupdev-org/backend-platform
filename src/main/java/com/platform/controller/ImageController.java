@@ -10,6 +10,7 @@ import com.platform.service.ImageService;
 import com.platform.service.UserService;
 import com.platform.storage.ImageTarget;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,7 +24,7 @@ import java.util.UUID;
 
 /**
  * Two-step image upload. The client asks for an upload URL, PUTs the file to it, then
- * calls the attach endpoint with the returned storage key.
+ * calls the attachment endpoint with the returned storage key.
  */
 @Tag(name = "Images", description = "Business and employee image uploads")
 @RestController
@@ -59,12 +60,13 @@ public class ImageController {
     @PutMapping("/images")
     public ResponseEntity<BusinessResponseDTO> attachBusinessImage(
             @PathVariable UUID businessId,
+            @Parameter(description = "Target scope of the image", example = "LOGO / COVER")
             @RequestParam ImageTarget target,
             @Valid @RequestBody AttachImageRequestDTO request,
             Authentication authentication) {
         User currentUser = currentUser(authentication);
-        return ResponseEntity.ok(imageService.attachBusinessImage(
-                businessId, target, request.getStorageKey(), currentUser));
+        return ResponseEntity.ok(imageService.
+                attachBusinessImage(businessId, target, request.getStorageKey(), currentUser));
     }
 
     @Operation(summary = "Remove the business logo or cover image")

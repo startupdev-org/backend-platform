@@ -2,11 +2,8 @@ package com.platform.dto.location;
 
 import lombok.Data;
 
-import java.util.UUID;
-
 @Data
 public class LocationRequestDTO {
-    private UUID businessId;
     private String name;
     private String address;
     private String city;

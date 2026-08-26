@@ -4,7 +4,10 @@ import com.platform.dto.business.CreateWorkingHoursRequest;
 import com.platform.dto.business.BusinessWorkingHoursDTO;
 import com.platform.entity.Business;
 import com.platform.entity.BusinessWorkingHours;
+import com.platform.exception.BadRequestException;
 import com.platform.exception.BusinessException;
+import com.platform.exception.ConflictException;
+import com.platform.exception.ResourceNotFoundException;
 import com.platform.repository.BusinessRepository;
 import com.platform.repository.BusinessWorkingHoursRepository;
 import jakarta.transaction.Transactional;
@@ -23,13 +26,16 @@ public class BusinessWorkingHoursService {
     private final BusinessRepository businessRepository;
     private final BusinessWorkingHoursRepository workingHoursRepository;
 
+    private static final String BUSINESS_NOT_FOUND = "Business not found";
+    private static final String WORKING_HOURS_NOT_FOUND = "Working hours not found";
+
     public BusinessWorkingHoursDTO create(UUID businessId,
                                           CreateWorkingHoursRequest request) {
 
         validateTimeRange(request.getOpenTime(), request.getCloseTime());
 
         Business business = businessRepository.findById(businessId)
-                .orElseThrow(() -> new RuntimeException("Business not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_NOT_FOUND));
 
         validateNoOverlap(
                 businessId,
@@ -80,7 +86,7 @@ public class BusinessWorkingHoursService {
         validateTimeRange(request.getOpenTime(), request.getCloseTime());
 
         BusinessWorkingHours existing = workingHoursRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Working hours not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(WORKING_HOURS_NOT_FOUND));
 
         if (!existing.getBusiness().getId().equals(businessId)) {
             throw new BusinessException("Invalid business for this working hours entry");
@@ -104,7 +110,7 @@ public class BusinessWorkingHoursService {
     public void delete(UUID businessId, Long id) {
 
         BusinessWorkingHours existing = workingHoursRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Working hours not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(WORKING_HOURS_NOT_FOUND));
 
         if (!existing.getBusiness().getId().equals(businessId)) {
             throw new BusinessException("Invalid business for this working hours entry");
@@ -119,7 +125,7 @@ public class BusinessWorkingHoursService {
 
     private void validateTimeRange(LocalTime open, LocalTime close) {
         if (!open.isBefore(close)) {
-            throw new IllegalArgumentException("Open time must be before close time");
+            throw new BadRequestException("Open time must be before close time");
         }
     }
 
@@ -143,7 +149,7 @@ public class BusinessWorkingHoursService {
                             newEnd.isAfter(hours.getOpenTime());
 
                 if (overlaps) {
-                throw new IllegalArgumentException(
+                throw new ConflictException(
                         "Working hours overlap with existing interval"
                 );
             }

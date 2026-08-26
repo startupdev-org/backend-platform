@@ -47,7 +47,7 @@ Spring Boot 3.2 / Java 17 REST API. Package root: `com.platform`.
 
 **DTO mapping**: `BusinessMapper` (manual static methods, not MapStruct) handles `Business → BusinessResponseDTO`. Most other DTOs use plain constructors or `@Builder`. MapStruct is in the dependency and annotation processor but is not yet used widely.
 
-**Storage / images**: presigned direct-to-bucket uploads, in `com.platform.storage`. `StorageProvider` is the only abstraction that knows the provider; `SupabaseStorageProvider` is the sole implementation, selected by `storage.provider`. **No image bytes ever pass through this application** — the browser PUTs straight to the bucket.
+**Storage / images**: presigned direct-to-bucket uploads, in `com.platform.storage`. `StorageProvider` is the only abstraction that knows the provider; `R2StorageProvider` (Cloudflare R2, via its S3-compatible API — `software.amazon.awssdk:s3`/`s3-presigner`) is the sole implementation, selected by `storage.provider`. **No image bytes ever pass through this application** — the browser PUTs straight to the bucket.
 
 Three steps: `POST /api/business/{id}/images/upload-url?target=LOGO|COVER` returns a short-lived signed URL plus a **server-generated** `storageKey`; the browser PUTs the file to that URL; `PUT /api/business/{id}/images?target=…` attaches the key. Employee photos mirror this under `/api/business/{id}/employee/{employeeId}/images`. `DELETE` on either path clears the image.
 
@@ -57,7 +57,9 @@ The client never supplies a file name or folder — only a content type (`image/
 
 Images are **not** settable through `BusinessRequestDTO` / `EmployeeRequestDTO` — those fields are gone. Only the image endpoints write them.
 
-The upload size limit **cannot be enforced in Java** in this flow. `storage.max-upload-bytes` is advisory to the client plus a backstop re-check at attach time; the real gate is the bucket's own `file_size_limit` and `allowed_mime_types`, and the bucket's CORS rules must allow `PUT` from `ALLOWED_ORIGINS` or every browser upload fails.
+The upload size limit **cannot be enforced in Java** in this flow. `storage.max-upload-bytes` is advisory to the client plus a backstop re-check at attach time; the real gate is the bucket's own upload restrictions, and the bucket's CORS rules must allow `PUT` from `ALLOWED_ORIGINS` or every browser upload fails.
+
+Public URLs are built by `R2StorageProvider.toPublicUrl` as `storage.r2.public-url-base + "/" + key` — currently the bucket's `pub-<hash>.r2.dev` subdomain, until a custom domain replaces it (a one-line config change, not a code change).
 
 **Slugs**: `SlugGenerator.generate(name)` produces the unique URL-safe identifier stored on `Business.slug`.
 

@@ -7,6 +7,7 @@ import com.platform.entity.User;
 import com.platform.exception.BusinessException;
 import com.platform.exception.BusinessFeatureAlreadyExistsException;
 import com.platform.exception.BusinessOwnershipException;
+import com.platform.exception.ResourceNotFoundException;
 import com.platform.exception.UserNotEnabledException;
 import com.platform.repository.BusinessFeatureRepository;
 import com.platform.repository.BusinessRepository;
@@ -82,11 +83,11 @@ public class FeatureService {
 
     public BusinessFeature getFeatureById(Long featureId) {
         return featureRepository.findById(featureId)
-                .orElseThrow(() -> new RuntimeException("Feature not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Feature not found"));
     }
 
     private Business getBusinessById(UUID id) {
         return businessRepository.findById(id)
-                .orElseThrow(() -> new BusinessException("Business not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Business not found"));
     }
 }

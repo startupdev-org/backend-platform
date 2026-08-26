@@ -23,7 +23,6 @@ public class EmployeeRequestDTO {
 
     private String phoneNumber;
 
-    private String photoUrl;
-
+    // Photo changes only through /api/business/{id}/employee/{id}/images.
     private Boolean enabled;
 }

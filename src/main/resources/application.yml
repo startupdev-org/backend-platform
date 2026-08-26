@@ -65,6 +65,7 @@ storage:
     secret-access-key: ${R2_SECRET_ACCESS_KEY:}
     public-url-base: ${R2_PUBLIC_URL_BASE:}
 
+
 logging:
   level:
     root: INFO

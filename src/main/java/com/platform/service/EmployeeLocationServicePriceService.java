@@ -2,12 +2,15 @@ package com.platform.service;
 
 import com.platform.dto.EmployeeLocationServicePriceRequestDTO;
 import com.platform.dto.EmployeeLocationServicePriceResponseDTO;
+import com.platform.entity.Business;
 import com.platform.entity.Employee;
 import com.platform.entity.EmployeeLocationServicePrice;
 import com.platform.entity.Location;
 import com.platform.entity.ProvidedService;
+import com.platform.entity.User;
 import com.platform.exception.BusinessException;
 import com.platform.exception.ResourceNotFoundException;
+import com.platform.repository.BusinessRepository;
 import com.platform.repository.EmployeeLocationServicePriceRepository;
 import com.platform.repository.EmployeeRepository;
 import com.platform.repository.LocationRepository;
@@ -29,11 +32,17 @@ public class EmployeeLocationServicePriceService {
     private final EmployeeRepository employeeRepository;
     private final ServiceRepository serviceRepository;
     private final LocationRepository locationRepository;
+    private final BusinessRepository businessRepository;
+
+    private static final String BUSINESS_NOT_FOUND = "Business not found";
+    private static final String PRICE_ENTRY_NOT_FOUND = "Price entry not found";
 
     @Transactional
-    public EmployeeLocationServicePriceResponseDTO create(EmployeeLocationServicePriceRequestDTO dto) {
-        log.info("Creating price entry for employeeId={}, serviceId={}, locationId={}",
-                dto.employeeId(), dto.serviceId(), dto.locationId());
+    public EmployeeLocationServicePriceResponseDTO create(UUID businessId, EmployeeLocationServicePriceRequestDTO dto, User currentUser) {
+        log.info("Creating price entry for businessId={}, employeeId={}, serviceId={}, locationId={}",
+                businessId, dto.employeeId(), dto.serviceId(), dto.locationId());
+
+        Business business = loadBusinessAndValidateOwnership(businessId, currentUser);
 
         if (priceRepository.existsByEmployeeIdAndServiceIdAndLocationId(
                 dto.employeeId(), dto.serviceId(), dto.locationId())) {
@@ -60,6 +69,8 @@ public class EmployeeLocationServicePriceService {
                     return new ResourceNotFoundException("Location not found");
                 });
 
+        validateSameBusiness(business, employee, service, location);
+
         EmployeeLocationServicePrice entity = EmployeeLocationServicePrice.builder()
                 .employee(employee)
                 .service(service)
@@ -73,14 +84,12 @@ public class EmployeeLocationServicePriceService {
     }
 
     @Transactional
-    public EmployeeLocationServicePriceResponseDTO update(UUID id, EmployeeLocationServicePriceRequestDTO dto) {
-        log.info("Updating price entry id={}", id);
+    public EmployeeLocationServicePriceResponseDTO update(UUID businessId, UUID id, EmployeeLocationServicePriceRequestDTO dto, User currentUser) {
+        log.info("Updating price entry id={} for businessId={}", id, businessId);
 
-        EmployeeLocationServicePrice entity = priceRepository.findById(id)
-                .orElseThrow(() -> {
-                    log.error("Price entry not found: id={}", id);
-                    return new ResourceNotFoundException("Price entry not found");
-                });
+        Business business = loadBusinessAndValidateOwnership(businessId, currentUser);
+
+        EmployeeLocationServicePrice entity = getPriceForBusiness(business, id);
 
         // If the combination changed, check for duplicate
         boolean combinationChanged =
@@ -103,6 +112,8 @@ public class EmployeeLocationServicePriceService {
             Location location = locationRepository.findById(dto.locationId())
                     .orElseThrow(() -> new ResourceNotFoundException("Location not found"));
 
+            validateSameBusiness(business, employee, service, location);
+
             entity.setEmployee(employee);
             entity.setService(service);
             entity.setLocation(location);
@@ -116,41 +127,82 @@ public class EmployeeLocationServicePriceService {
     }
 
     @Transactional(readOnly = true)
-    public EmployeeLocationServicePriceResponseDTO getById(UUID id) {
-        log.debug("Fetching price entry id={}", id);
-        return priceRepository.findById(id)
-                .map(this::toDTO)
-                .orElseThrow(() -> {
-                    log.error("Price entry not found: id={}", id);
-                    return new ResourceNotFoundException("Price entry not found");
-                });
+    public EmployeeLocationServicePriceResponseDTO getById(UUID businessId, UUID id) {
+        log.debug("Fetching price entry id={} for businessId={}", id, businessId);
+        Business business = businessRepository.findById(businessId)
+                .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_NOT_FOUND));
+        return toDTO(getPriceForBusiness(business, id));
     }
 
     @Transactional(readOnly = true)
-    public List<EmployeeLocationServicePriceResponseDTO> getByEmployee(UUID employeeId) {
-        log.debug("Fetching all price entries for employeeId={}", employeeId);
+    public List<EmployeeLocationServicePriceResponseDTO> getByEmployee(UUID businessId, UUID employeeId) {
+        log.debug("Fetching all price entries for businessId={}, employeeId={}", businessId, employeeId);
+        validateEmployeeBelongsToBusiness(businessId, employeeId);
         return priceRepository.findByEmployeeId(employeeId)
                 .stream().map(this::toDTO).toList();
     }
 
     @Transactional(readOnly = true)
     public List<EmployeeLocationServicePriceResponseDTO> getByEmployeeAndLocation(
-            UUID employeeId, UUID locationId) {
-        log.debug("Fetching price entries for employeeId={}, locationId={}", employeeId, locationId);
+            UUID businessId, UUID employeeId, UUID locationId) {
+        log.debug("Fetching price entries for businessId={}, employeeId={}, locationId={}", businessId, employeeId, locationId);
+        validateEmployeeBelongsToBusiness(businessId, employeeId);
         return priceRepository.findByEmployeeIdAndLocationId(employeeId, locationId)
                 .stream().map(this::toDTO).toList();
     }
 
     @Transactional
-    public void delete(UUID id) {
-        log.info("Deleting price entry id={}", id);
-        EmployeeLocationServicePrice entity = priceRepository.findById(id)
-                .orElseThrow(() -> {
-                    log.error("Price entry not found for deletion: id={}", id);
-                    return new ResourceNotFoundException("Price entry not found");
-                });
+    public void delete(UUID businessId, UUID id, User currentUser) {
+        log.info("Deleting price entry id={} for businessId={}", id, businessId);
+        Business business = loadBusinessAndValidateOwnership(businessId, currentUser);
+        EmployeeLocationServicePrice entity = getPriceForBusiness(business, id);
         priceRepository.delete(entity);
         log.info("Deleted price entry id={}", id);
+    }
+
+    // ── Ownership / consistency helpers ─────────────────────────────────────────
+
+    private Business loadBusinessAndValidateOwnership(UUID businessId, User currentUser) {
+        Business business = businessRepository.findById(businessId)
+                .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_NOT_FOUND));
+
+        if (business.isNotOwner(currentUser) &&
+                !currentUser.getRole().equals(User.UserRole.PLATFORM_ADMIN)) {
+            throw new BusinessException("Unauthorized");
+        }
+
+        return business;
+    }
+
+    private void validateSameBusiness(Business business, Employee employee, ProvidedService service, Location location) {
+        UUID businessId = business.getId();
+        if (!employee.getBusiness().getId().equals(businessId) ||
+                !service.getBusiness().getId().equals(businessId) ||
+                !location.getBusiness().getId().equals(businessId)) {
+            throw new BusinessException("Employee, service and location must all belong to the same business");
+        }
+    }
+
+    private void validateEmployeeBelongsToBusiness(UUID businessId, UUID employeeId) {
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+        if (!employee.getBusiness().getId().equals(businessId)) {
+            throw new ResourceNotFoundException("Employee not found");
+        }
+    }
+
+    private EmployeeLocationServicePrice getPriceForBusiness(Business business, UUID id) {
+        EmployeeLocationServicePrice entity = priceRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.error("Price entry not found: id={}", id);
+                    return new ResourceNotFoundException(PRICE_ENTRY_NOT_FOUND);
+                });
+
+        if (!entity.getEmployee().getBusiness().getId().equals(business.getId())) {
+            throw new ResourceNotFoundException(PRICE_ENTRY_NOT_FOUND);
+        }
+
+        return entity;
     }
 
     // ── Mapper ────────────────────────────────────────────────────────────────

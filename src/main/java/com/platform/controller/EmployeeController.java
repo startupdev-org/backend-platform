@@ -11,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -45,6 +46,15 @@ public class EmployeeController {
     public ResponseEntity<EmployeeResponseDTO> getEmployee(@PathVariable UUID employeeId) {
         EmployeeResponseDTO employee = employeeService.getEmployee(employeeId);
         return ResponseEntity.ok(employee);
+    }
+
+    @GetMapping("/{employeeId}/admin")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
+    public ResponseEntity<EmployeeResponseDTO> getEmployeeForAdmin(
+            @PathVariable UUID employeeId,
+            Authentication authentication) {
+        User currentUser = userService.getUserByUsername(authentication.getName());
+        return ResponseEntity.ok(employeeService.getEmployeeForAdmin(employeeId, currentUser));
     }
 
     @GetMapping("/active")
@@ -82,6 +92,17 @@ public class EmployeeController {
             Authentication authentication) {
         User currentUser = userService.getUserByUsername(authentication.getName());
         employeeService.deleteEmployee(businessId, employeeId, currentUser);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{employeeId}/permanent")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
+    public ResponseEntity<Void> hardDeleteEmployee(
+            @PathVariable UUID businessId,
+            @PathVariable UUID employeeId,
+            Authentication authentication) {
+        User currentUser = userService.getUserByUsername(authentication.getName());
+        employeeService.hardDeleteEmployee(businessId, employeeId, currentUser);
         return ResponseEntity.noContent().build();
     }
 }

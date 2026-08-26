@@ -21,7 +21,7 @@ public class EmployeeResponseDTO {
     private String phoneNumber;
     private String photoUrl;
     private UUID businessId;
-    private Boolean active;
+    private Boolean enabled;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

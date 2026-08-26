@@ -2,6 +2,7 @@ package com.platform.dto.auth;
 
 import com.platform.dto.business.BusinessResponseDTO;
 import com.platform.dto.employee.EmployeeResponseDTO;
+import com.platform.dto.location.LocationResponseDTO;
 import com.platform.dto.service.ServiceResponseDTO;
 import com.platform.dto.user.UserResponseDTO;
 import lombok.AllArgsConstructor;
@@ -27,4 +28,5 @@ public class WhoAmIResponseDTO {
     private List<BusinessResponseDTO> businessList;
     private List<ServiceResponseDTO> providedServiceList;
     private List<EmployeeResponseDTO> employeeList;
+    private List<LocationResponseDTO> locationList;
 }

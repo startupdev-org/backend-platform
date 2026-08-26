@@ -5,6 +5,7 @@ import com.platform.dto.business.BusinessMapper;
 import com.platform.dto.business.BusinessRequestDTO;
 import com.platform.dto.business.BusinessResponseDTO;
 import com.platform.dto.employee.EmployeeResponseDTO;
+import com.platform.dto.location.LocationResponseDTO;
 import com.platform.dto.service.ServiceResponseDTO;
 import com.platform.entity.Business;
 import com.platform.entity.User;
@@ -33,6 +34,7 @@ public class BusinessService {
     private final ProvidedServicesService providedServicesService;
     private final EmployeeService employeeService;
     private final FeatureService featureService;
+    private final LocationService locationService;
 
     private static final String BUSINESS_EXCEPTION = "Business not found";
 
@@ -147,8 +149,9 @@ public class BusinessService {
         User owner = userService.getUserById(business.getOwner().getId());
         List<EmployeeResponseDTO> employeeList = employeeService.getBusinessEmployeesList(business.getId());
         Set<BusinessFeatureDTO> featureList = featureService.getAllFeatures(business.getId());
+        List<LocationResponseDTO> locationList = locationService.getLocationsForBusiness(business.getId());
 
-        return BusinessMapper.toDTO(business, businessServices, employeeList, featureList, owner);
+        return BusinessMapper.toDTO(business, businessServices, employeeList, featureList, locationList, owner);
     }
 
     private User getUser() {

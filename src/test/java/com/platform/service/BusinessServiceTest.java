@@ -2,6 +2,7 @@ package com.platform.service;
 
 import com.platform.dto.business.BusinessFeatureDTO;
 import com.platform.dto.employee.EmployeeResponseDTO;
+import com.platform.dto.location.LocationResponseDTO;
 import com.platform.dto.service.ServiceResponseDTO;
 import com.platform.entity.*;
 import com.platform.enums.ServiceDeliveryType;
@@ -48,6 +49,9 @@ class BusinessServiceTest {
 
     @Mock
     private EmployeeService employeeService;
+
+    @Mock
+    private LocationService locationService;
 
     @Mock
     private FeatureService featureService;
@@ -130,6 +134,38 @@ class BusinessServiceTest {
         business.setWorkingHours(hoursList);
 
         return business;
+    }
+
+    private List<Location> createLocationList() {
+        Location locationOne = Location.builder()
+                .name("Location One")
+                .build();
+
+        Location locationSecond = Location.builder()
+                .name("Location Second")
+                .build();
+
+        Location locationThird = Location.builder()
+                .name("Location Third")
+                .build();
+
+        return List.of(locationOne, locationSecond, locationThird);
+    }
+
+    private List<LocationResponseDTO> createLocationResponseDTOList() {
+        LocationResponseDTO locationOne = LocationResponseDTO.builder()
+                .name("Location One")
+                .build();
+
+        LocationResponseDTO locationSecond = LocationResponseDTO.builder()
+                .name("Location Second")
+                .build();
+
+        LocationResponseDTO locationThird = LocationResponseDTO.builder()
+                .name("Location Third")
+                .build();
+
+        return List.of(locationOne, locationSecond, locationThird);
     }
 
     private Set<BusinessFeature> createFeatureList() {
@@ -233,6 +269,9 @@ class BusinessServiceTest {
         when(employeeService.getBusinessEmployeesList(any()))
                 .thenReturn(new ArrayList<>());
 
+        when(locationService.getLocationsForBusiness(any()))
+                .thenReturn(createLocationResponseDTOList());
+
         BusinessResponseDTO response =
                 businessService.createBusiness(dto);
 
@@ -283,6 +322,9 @@ class BusinessServiceTest {
         when(featureService.getAllFeatures(any()))
                 .thenReturn(createFeatureDTOList());
 
+        when(locationService.getLocationsForBusiness(any()))
+                .thenReturn(createLocationResponseDTOList());
+
         BusinessResponseDTO dto =
                 businessService.getBusinessDTOById(business.getId());
 
@@ -327,6 +369,9 @@ class BusinessServiceTest {
         when(employeeService.getBusinessEmployeesList(business.getId()))
                 .thenReturn(List.of());
 
+        when(locationService.getLocationsForBusiness(any()))
+                .thenReturn(createLocationResponseDTOList());
+
         BusinessResponseDTO dto =
                 businessService.getBusinessBySlug(business.getSlug());
 
@@ -354,6 +399,9 @@ class BusinessServiceTest {
 
         when(employeeService.getBusinessEmployeesList(business.getId()))
                 .thenReturn(List.of());
+
+        when(locationService.getLocationsForBusiness(any()))
+                .thenReturn(createLocationResponseDTOList());
 
         Page<BusinessResponseDTO> page =
                 businessService.listBusinesses(
@@ -393,6 +441,9 @@ class BusinessServiceTest {
 
         when(employeeService.getBusinessEmployeesList(business.getId()))
                 .thenReturn(List.of());
+
+        when(locationService.getLocationsForBusiness(any()))
+                .thenReturn(createLocationResponseDTOList());
 
         BusinessResponseDTO dto =
                 businessService.updateBusiness(
@@ -476,6 +527,8 @@ class BusinessServiceTest {
         when(employeeService.getBusinessEmployeesList(business.getId()))
                 .thenReturn(List.of());
 
+        when(locationService.getLocationsForBusiness(any()))
+                .thenReturn(createLocationResponseDTOList());
 
         List<BusinessResponseDTO> result =
                 businessService.getUserBusinesses(userId);

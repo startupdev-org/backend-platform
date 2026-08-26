@@ -30,7 +30,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: '17'
-          distribution: 'temurin'
+          distribution: temurin
           cache: maven
 
       - name: Run tests
@@ -52,5 +52,5 @@ jobs:
 
       - name: Deploy on Northflank
         run: |
-          echo "Webhook URL is configured: $([[ -n "$NORTHFLANK_WEBHOOK_URL" ]] && echo yes || echo no)"
-          curl -v --fail "$NORTHFLANK_WEBHOOK_URL"
+          curl --fail --silent --show-error \
+            "$NORTHFLANK_WEBHOOK_URL"

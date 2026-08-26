@@ -6,15 +6,13 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  DEPLOY_URL: ${{ vars.RENDER_DEPLOY_HOOK_URL }}
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    environment: dev
     permissions:
       contents: read
       packages: write
-    env:
-      DEPLOY_URL: ${{ var.RENDER_DEPLOY_HOOK_URL }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4

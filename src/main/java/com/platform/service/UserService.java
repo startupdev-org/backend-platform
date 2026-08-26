@@ -4,21 +4,16 @@ import com.platform.dto.auth.WhoAmIResponseDTO;
 import com.platform.dto.business.BusinessMapper;
 import com.platform.dto.business.BusinessResponseDTO;
 import com.platform.dto.employee.EmployeeMapper;
+import com.platform.dto.location.LocationMapper;
 import com.platform.dto.service.ServiceMapper;
 import com.platform.dto.user.AdminUserUpdateRequest;
 import com.platform.dto.user.UpdateProfileRequest;
 import com.platform.dto.user.UserResponseDTO;
-import com.platform.entity.Business;
-import com.platform.entity.Employee;
-import com.platform.entity.ProvidedService;
-import com.platform.entity.User;
+import com.platform.entity.*;
 import com.platform.exception.BusinessException;
 import com.platform.exception.ConflictException;
 import com.platform.exception.UserNotFoundException;
-import com.platform.repository.BusinessRepository;
-import com.platform.repository.EmployeeRepository;
-import com.platform.repository.ServiceRepository;
-import com.platform.repository.UserRepository;
+import com.platform.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -43,6 +38,7 @@ public class UserService {
     private final BusinessRepository businessRepository;
     private final ServiceRepository serviceRepository;
     private final EmployeeRepository employeeRepository;
+    private final LocationRepository locationRepository;
 
     // ── Current user ──────────────────────────────────────────────────────────
 
@@ -110,6 +106,8 @@ public class UserService {
                 ? List.of() : serviceRepository.findByBusinessIdIn(businessIds);
         List<Employee> employees = businessIds.isEmpty()
                 ? List.of() : employeeRepository.findByBusinessIdInAndEnabled(businessIds, true);
+        List<Location> locations = businessIds.isEmpty()
+                ? List.of() : locationRepository.findByBusinessIdIn(businessIds);
 
         // DTOs, never entities: entities would carry the password hash and let Jackson walk
         // lazy associations outside the transaction.
@@ -122,6 +120,7 @@ public class UserService {
                 .businessList(businessDTOs)
                 .providedServiceList(ServiceMapper.toDTOList(services))
                 .employeeList(EmployeeMapper.toDTOList(employees))
+                .locationList(LocationMapper.toDTOList(locations))
                 .build();
     }
 

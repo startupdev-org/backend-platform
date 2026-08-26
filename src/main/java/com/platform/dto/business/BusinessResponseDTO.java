@@ -1,6 +1,7 @@
 package com.platform.dto.business;
 
 import com.platform.dto.employee.EmployeeResponseDTO;
+import com.platform.dto.location.LocationResponseDTO;
 import com.platform.dto.service.ServiceResponseDTO;
 import com.platform.dto.user.UserResponseDTO;
 import com.platform.entity.Employee;
@@ -38,6 +39,7 @@ public class BusinessResponseDTO {
     private List<EmployeeResponseDTO> employeeList;
     private List<BusinessWorkingHoursDTO> businessWorkingHours;
     private Set<BusinessFeatureDTO> businessFeatures;
+    private List<LocationResponseDTO> locationList;
 
 
     public boolean isNotOwner(User userToCheck) {

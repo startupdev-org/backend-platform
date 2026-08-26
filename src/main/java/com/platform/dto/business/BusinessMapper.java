@@ -1,6 +1,7 @@
 package com.platform.dto.business;
 
 import com.platform.dto.employee.EmployeeResponseDTO;
+import com.platform.dto.location.LocationResponseDTO;
 import com.platform.dto.service.ServiceResponseDTO;
 import com.platform.dto.user.UserResponseDTO;
 import com.platform.entity.Business;
@@ -67,6 +68,37 @@ public class BusinessMapper {
                 .providedServices(services)
                 .employeeList(employeeList)
                 .businessFeatures(features)
+                .build();
+    }
+
+    public static BusinessResponseDTO toDTO(
+            Business business,
+            List<ServiceResponseDTO> services,
+            List<EmployeeResponseDTO> employeeList,
+            Set<BusinessFeatureDTO> features,
+            List<LocationResponseDTO> locationList,
+            User owner
+    ) {
+        return BusinessResponseDTO.builder()
+                .id(business.getId())
+                .name(business.getName())
+                .slug(business.getSlug())
+                .description(business.getDescription())
+                .address(business.getAddress())
+                .city(business.getCity())
+                .phone(business.getPhone())
+                .website(business.getWebsite())
+                .logoUrl(business.getLogoUrl())
+                .coverImageUrl(business.getCoverImageUrl())
+                .ratingOverall(business.getRatingOverall() != null ? business.getRatingOverall() : 0.0)
+                .createdAt(business.getCreatedAt())
+                .updatedAt(business.getUpdatedAt())
+                .owner(owner != null ? toDTO(owner) : null)
+                .businessWorkingHours(toWorkingHoursDTOList(business.getWorkingHours()))
+                .providedServices(services)
+                .employeeList(employeeList)
+                .businessFeatures(features)
+                .locationList(locationList)
                 .build();
     }
 

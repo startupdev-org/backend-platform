@@ -4,6 +4,7 @@ import com.platform.dto.employee.EmployeeRequestDTO;
 import com.platform.dto.employee.EmployeeResponseDTO;
 import com.platform.entity.User;
 import com.platform.service.EmployeeService;
+import com.platform.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -22,6 +23,7 @@ import java.util.UUID;
 public class EmployeeController {
 
     private final EmployeeService employeeService;
+    private final UserService userService;
 
     @GetMapping
     public ResponseEntity<Page<EmployeeResponseDTO>> listEmployees(
@@ -68,7 +70,7 @@ public class EmployeeController {
             @PathVariable UUID employeeId,
             @Valid @RequestBody EmployeeRequestDTO request,
             Authentication authentication) {
-        User currentUser = (User) authentication.getPrincipal();
+        User currentUser = userService.getUserByUsername(authentication.getName());
         EmployeeResponseDTO employee = employeeService.updateEmployee(businessId, employeeId, request, currentUser);
         return ResponseEntity.ok(employee);
     }
@@ -78,7 +80,7 @@ public class EmployeeController {
             @PathVariable UUID businessId,
             @PathVariable UUID employeeId,
             Authentication authentication) {
-        User currentUser = (User) authentication.getPrincipal();
+        User currentUser = userService.getUserByUsername(authentication.getName());
         employeeService.deleteEmployee(businessId, employeeId, currentUser);
         return ResponseEntity.noContent().build();
     }

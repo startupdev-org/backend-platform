@@ -1,5 +1,6 @@
 package com.platform.service;
 
+import com.platform.dto.employee.EmployeeMapper;
 import com.platform.dto.employee.EmployeeRequestDTO;
 import com.platform.dto.employee.EmployeeResponseDTO;
 import com.platform.entity.Business;
@@ -10,6 +11,7 @@ import com.platform.exception.ResourceNotFoundException;
 import com.platform.repository.BookingRepository;
 import com.platform.repository.BusinessRepository;
 import com.platform.repository.EmployeeRepository;
+import com.platform.storage.ImageUrlResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -30,6 +32,7 @@ public class EmployeeService {
     private final BusinessRepository businessRepository;
     private final BookingRepository bookingRepository;
     private final UserService userService;
+    private final ImageUrlResolver imageUrls;
 
     private static final String BUSINESS_EXCEPTION = "Business not found";
     private static final String EMPLOYEE_NOT_FOUND_EXCEPTION = "Employee not found";
@@ -48,7 +51,6 @@ public class EmployeeService {
                 .lastName(dto.getLastName())
                 .email(dto.getEmail())
                 .phoneNumber(dto.getPhoneNumber())
-                .photoUrl(dto.getPhotoUrl())
                 .enabled(true)
                 .business(business)
                 .build();
@@ -129,7 +131,6 @@ public class EmployeeService {
         if (dto.getPhoneNumber() != null) {
             employee.setPhoneNumber(dto.getPhoneNumber());
         }
-        employee.setPhotoUrl(dto.getPhotoUrl());
         if (dto.getEnabled() != null) {
             employee.setEnabled(dto.getEnabled());
         }
@@ -191,18 +192,7 @@ public class EmployeeService {
     }
 
     private EmployeeResponseDTO toDTO(Employee employee) {
-        return EmployeeResponseDTO.builder()
-                .id(employee.getId())
-                .firstName(employee.getFirstName())
-                .lastName(employee.getLastName())
-                .email(employee.getEmail())
-                .phoneNumber(employee.getPhoneNumber())
-                .photoUrl(employee.getPhotoUrl())
-                .businessId(employee.getBusiness().getId())
-                .enabled(employee.getEnabled())
-                .createdAt(employee.getCreatedAt())
-                .updatedAt(employee.getUpdatedAt())
-                .build();
+        return EmployeeMapper.toDTO(employee, imageUrls);
     }
 
     private User getUser() {

@@ -8,6 +8,7 @@ import com.platform.entity.Business;
 import com.platform.entity.BusinessWorkingHours;
 import com.platform.entity.ProvidedService;
 import com.platform.entity.User;
+import com.platform.storage.ImageUrlResolver;
 
 import java.util.List;
 import java.util.Set;
@@ -47,7 +48,8 @@ public class BusinessMapper {
             List<ServiceResponseDTO> services,
             List<EmployeeResponseDTO> employeeList,
             Set<BusinessFeatureDTO> features,
-            User owner
+            User owner,
+            ImageUrlResolver imageUrls
     ) {
         return BusinessResponseDTO.builder()
                 .id(business.getId())
@@ -58,8 +60,8 @@ public class BusinessMapper {
                 .city(business.getCity())
                 .phone(business.getPhone())
                 .website(business.getWebsite())
-                .logoUrl(business.getLogoUrl())
-                .coverImageUrl(business.getCoverImageUrl())
+                .logoUrl(imageUrls.toPublicUrl(business.getLogoKey()))
+                .coverImageUrl(imageUrls.toPublicUrl(business.getCoverImageKey()))
                 .ratingOverall(business.getRatingOverall() != null ? business.getRatingOverall() : 0.0)
                 .createdAt(business.getCreatedAt())
                 .updatedAt(business.getUpdatedAt())
@@ -77,7 +79,8 @@ public class BusinessMapper {
             List<EmployeeResponseDTO> employeeList,
             Set<BusinessFeatureDTO> features,
             List<LocationResponseDTO> locationList,
-            User owner
+            User owner,
+            ImageUrlResolver imageUrls
     ) {
         return BusinessResponseDTO.builder()
                 .id(business.getId())
@@ -88,8 +91,8 @@ public class BusinessMapper {
                 .city(business.getCity())
                 .phone(business.getPhone())
                 .website(business.getWebsite())
-                .logoUrl(business.getLogoUrl())
-                .coverImageUrl(business.getCoverImageUrl())
+                .logoUrl(imageUrls.toPublicUrl(business.getLogoKey()))
+                .coverImageUrl(imageUrls.toPublicUrl(business.getCoverImageKey()))
                 .ratingOverall(business.getRatingOverall() != null ? business.getRatingOverall() : 0.0)
                 .createdAt(business.getCreatedAt())
                 .updatedAt(business.getUpdatedAt())
@@ -112,8 +115,6 @@ public class BusinessMapper {
                 .city(businessDTO.getCity())
                 .phone(businessDTO.getPhone())
                 .website(businessDTO.getWebsite())
-                .logoUrl(businessDTO.getLogoUrl())
-                .coverImageUrl(businessDTO.getCoverImageUrl())
                 .ratingOverall(businessDTO.getRatingOverall())
                 .createdAt(businessDTO.getCreatedAt())
                 .updatedAt(businessDTO.getUpdatedAt())

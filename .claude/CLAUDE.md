@@ -51,7 +51,17 @@ Spring Boot 3.2 / Java 17 REST API. Package root: `com.platform`.
 
 **DTO mapping**: `BusinessMapper` (manual static methods, not MapStruct) handles `Business → BusinessResponseDTO`. Most other DTOs use plain constructors or `@Builder`. MapStruct is in the dependency and annotation processor but is not yet used widely.
 
-**Storage**: none. The Supabase Storage integration (`StorageService`, `StorageController`, `RestTemplateConfig`) was removed during the move to Neon. `logo_url` / `cover_image_url` / `photo_url` are plain URL columns — nothing in the backend uploads or hosts files today.
+**Storage / images**: presigned direct-to-bucket uploads, in `com.platform.storage`. `StorageProvider` is the only abstraction that knows the provider; `SupabaseStorageProvider` is the sole implementation, selected by `storage.provider`. **No image bytes ever pass through this application** — the browser PUTs straight to the bucket.
+
+Three steps: `POST /api/business/{id}/images/upload-url?target=LOGO|COVER` returns a short-lived signed URL plus a **server-generated** `storageKey`; the browser PUTs the file to that URL; `PUT /api/business/{id}/images?target=…` attaches the key. Employee photos mirror this under `/api/business/{id}/employee/{employeeId}/images`. `DELETE` on either path clears the image.
+
+The client never supplies a file name or folder — only a content type (`image/jpeg|png|webp`). `ImageKeys` builds every key as `business/{businessId}/{slot}/{uuid}.{ext}`, and the attach step calls `ImageKeys.requirePrefix` to reject any key that this business and slot would not have produced. That prefix check is the tenant boundary; without it a caller could attach another business's object to their own row.
+
+`logo_key` / `cover_image_key` / `photo_key` (renamed from `*_url` in `V6`) hold the **storage key**, not a URL. `ImageUrlResolver.toPublicUrl` builds the public URL at response time, and passes any value already starting with `http` straight through — that is how pre-V6 rows keep rendering without a data backfill. Response DTO field names are unchanged (`logoUrl`, `coverImageUrl`, `photoUrl`), so the frontend contract did not move.
+
+Images are **not** settable through `BusinessRequestDTO` / `EmployeeRequestDTO` — those fields are gone. Only the image endpoints write them.
+
+The upload size limit **cannot be enforced in Java** in this flow. `storage.max-upload-bytes` is advisory to the client plus a backstop re-check at attach time; the real gate is the bucket's own `file_size_limit` and `allowed_mime_types`, and the bucket's CORS rules must allow `PUT` from `ALLOWED_ORIGINS` or every browser upload fails.
 
 **Slugs**: `SlugGenerator.generate(name)` produces the unique URL-safe identifier stored on `Business.slug`.
 
@@ -91,6 +101,7 @@ Locations and services are intentionally unlimited on every paid tier — they'r
 - Working hours are unprotected. `BusinessWorkingHoursController` is mapped at `/api/businesses/{businessId}/working-hours` (plural) while every `SecurityConfig` rule — including the `/api/business/**` catch-all — uses the singular path, so the `hasRole(BUSINESS_ADMIN)` rules at `SecurityConfig:78-80` are dead and these endpoints fall through to `.anyRequest().authenticated()`. `BusinessWorkingHoursService` also has no ownership check on `create`/`update`/`delete`, and the controller never resolves the current user. Net effect: any authenticated account, of any role, can create or delete working hours for any business. Fix by mirroring `LocationService.validateBusinessOwnership` and correcting the path (or the matcher).
 - Cross-tenant reads on the pricing endpoints. `EmployeeLocationServicePriceService.getById` / `getByEmployee` / `getByEmployeeAndLocation` take no `currentUser` and do no ownership check, and `SecurityConfig` maps `GET /api/business/*/employee-service-price/**` to `.authenticated()` — so any logged-in tenant can read another business's pricing table. Deliberately left open for now; decide whether prices are owner-only (add the ownership check) or public booking-page data (switch the rule to `permitAll()`, like the location GETs) before billing lands.
 - `BusinessCategoryType` is a closed enum (`BARBERSHOP, BEAUTY, SPA, NAILS`). Product direction is now general services, not beauty-only — this needs to become an admin-managed lookup table (id/slug/name), not a hardcoded enum, or every new vertical requires a code deploy.
+- Orphaned uploads are never reclaimed. An upload URL that is issued but never attached leaves an object in the bucket forever. The 60s signed-URL TTL keeps the window small and keys are namespaced per business so a sweep is easy, but there is no reaper yet — objects older than 24h whose key appears in no row should be deleted on a schedule.
 - `JwtAuthenticationFilter` never re-checks the user against the DB per request — role and `isEnabled` are trusted from the JWT claims for the token's full lifetime (up to `JWT_EXPIRATION`). This needs to change for `PAST_DUE` enforcement to actually cut access in real time rather than only at the next login.
 
 ## Configuration

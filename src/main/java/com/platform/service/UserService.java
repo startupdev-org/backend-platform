@@ -14,6 +14,7 @@ import com.platform.exception.BusinessException;
 import com.platform.exception.ConflictException;
 import com.platform.exception.UserNotFoundException;
 import com.platform.repository.*;
+import com.platform.storage.ImageUrlResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -39,6 +40,7 @@ public class UserService {
     private final ServiceRepository serviceRepository;
     private final EmployeeRepository employeeRepository;
     private final LocationRepository locationRepository;
+    private final ImageUrlResolver imageUrls;
 
     // ── Current user ──────────────────────────────────────────────────────────
 
@@ -112,14 +114,14 @@ public class UserService {
         // DTOs, never entities: entities would carry the password hash and let Jackson walk
         // lazy associations outside the transaction.
         List<BusinessResponseDTO> businessDTOs = businessList.stream()
-                .map(b -> BusinessMapper.toDTO(b, List.of(), List.of(), Set.of(), user))
+                .map(b -> BusinessMapper.toDTO(b, List.of(), List.of(), Set.of(), user, imageUrls))
                 .toList();
 
         return WhoAmIResponseDTO.builder()
                 .user(toResponseDTO(user))
                 .businessList(businessDTOs)
                 .providedServiceList(ServiceMapper.toDTOList(services))
-                .employeeList(EmployeeMapper.toDTOList(employees))
+                .employeeList(EmployeeMapper.toDTOList(employees, imageUrls))
                 .locationList(LocationMapper.toDTOList(locations))
                 .build();
     }

@@ -115,6 +115,14 @@ public class GlobalExceptionHandler {
 
     // ── 400 ───────────────────────────────────────────────────────────────────
 
+    // For domain rules that span more than one field, which Bean Validation cannot
+    // express per-field - an open time after a close time, for one.
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ErrorResponse> handleBadRequest(
+            BadRequestException ex, WebRequest request) {
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(
             MethodArgumentNotValidException ex, WebRequest request) {

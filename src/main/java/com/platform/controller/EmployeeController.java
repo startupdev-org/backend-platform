@@ -8,7 +8,7 @@ import com.platform.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import com.platform.utils.PageRequests;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,9 +30,11 @@ public class EmployeeController {
     public ResponseEntity<Page<EmployeeResponseDTO>> listEmployees(
             @PathVariable UUID businessId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String sort
     ) {
-        return ResponseEntity.ok(employeeService.getBusinessEmployees(businessId, PageRequest.of(page, size)));
+        return ResponseEntity.ok(employeeService.getBusinessEmployees(businessId,
+                PageRequests.of(page, size, sort, EmployeeService.SORTABLE_FIELDS, EmployeeService.DEFAULT_SORT)));
     }
 
     @GetMapping("/list")
@@ -61,9 +63,11 @@ public class EmployeeController {
     public ResponseEntity<Page<EmployeeResponseDTO>> listActiveEmployees(
             @PathVariable UUID businessId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String sort
     ) {
-        return ResponseEntity.ok(employeeService.getActiveEmployees(businessId, PageRequest.of(page, size)));
+        return ResponseEntity.ok(employeeService.getActiveEmployees(businessId,
+                PageRequests.of(page, size, sort, EmployeeService.SORTABLE_FIELDS, EmployeeService.DEFAULT_SORT)));
     }
 
     @PostMapping

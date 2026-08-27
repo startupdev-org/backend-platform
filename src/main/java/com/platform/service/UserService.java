@@ -18,6 +18,7 @@ import com.platform.storage.ImageUrlResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.Authentication;
@@ -127,6 +128,11 @@ public class UserService {
     }
 
     // ── Administration ────────────────────────────────────────────────────────
+
+    /** Whitelisted {@code sort} values for the user list endpoint. */
+    public static final Set<String> SORTABLE_FIELDS =
+            Set.of("email", "firstName", "lastName", "role", "createdAt", "updatedAt");
+    public static final Sort DEFAULT_SORT = Sort.by(Sort.Direction.DESC, "createdAt");
 
     public Page<UserResponseDTO> listUsers(Pageable pageable) {
         return userRepository.findAll(pageable)

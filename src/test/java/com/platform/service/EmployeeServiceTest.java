@@ -19,7 +19,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -254,8 +256,8 @@ class EmployeeServiceTest {
         Business business = createBusiness(owner);
         Employee employee = createEmployee(business);
 
-        when(employeeRepository.findByBusinessIdAndEnabled(business.getId(), true))
-                .thenReturn(List.of(employee));
+        when(employeeRepository.findByBusinessIdAndEnabled(eq(business.getId()), eq(true), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(employee)));
 
         Page<EmployeeResponseDTO> page = employeeService.getBusinessEmployees(
                 business.getId(), PageRequest.of(0, 10));
@@ -272,8 +274,8 @@ class EmployeeServiceTest {
         Business business = createBusiness(owner);
         Employee employee = createEmployee(business);
 
-        when(employeeRepository.findByBusinessIdAndEnabled(business.getId(), true))
-                .thenReturn(List.of(employee));
+        when(employeeRepository.findByBusinessIdAndEnabled(eq(business.getId()), eq(true), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(employee)));
 
         Page<EmployeeResponseDTO> page = employeeService.getActiveEmployees(
                 business.getId(), PageRequest.of(0, 10));

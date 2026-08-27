@@ -13,7 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import com.platform.utils.PageRequests;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -45,8 +45,11 @@ public class BusinessController {
             @Parameter(description = "Page number (0-based)", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "10")
-            @RequestParam(defaultValue = "10") int size) {
-        Page<BusinessResponseDTO> businesses = businessService.listBusinesses(city, minRating, businessCategory, PageRequest.of(page, size));
+            @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "Sort as 'field' or 'field,asc|desc'", example = "name,asc")
+            @RequestParam(required = false) String sort) {
+        Page<BusinessResponseDTO> businesses = businessService.listBusinesses(city, minRating, businessCategory,
+                PageRequests.of(page, size, sort, BusinessService.SORTABLE_FIELDS, BusinessService.DEFAULT_SORT));
         return ResponseEntity.ok(businesses);
     }
 
@@ -58,8 +61,11 @@ public class BusinessController {
             @Parameter(description = "Page number (0-based)", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "10")
-            @RequestParam(defaultValue = "10") int size) {
-        Page<BusinessResponseDTO> businesses = businessService.listBusinessesByQuery(query, PageRequest.of(page, size));
+            @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "Sort as 'field' or 'field,asc|desc'", example = "name,asc")
+            @RequestParam(required = false) String sort) {
+        Page<BusinessResponseDTO> businesses = businessService.listBusinessesByQuery(query,
+                PageRequests.of(page, size, sort, BusinessService.SORTABLE_FIELDS, BusinessService.DEFAULT_SORT));
         return ResponseEntity.ok(businesses);
     }
 

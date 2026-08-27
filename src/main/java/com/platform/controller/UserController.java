@@ -13,7 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import com.platform.utils.PageRequests;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -81,8 +81,11 @@ public class UserController {
             @Parameter(description = "Page number (0-based)", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "10")
-            @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(userService.listUsers(PageRequest.of(page, size)));
+            @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "Sort as 'field' or 'field,asc|desc'", example = "email,asc")
+            @RequestParam(required = false) String sort) {
+        return ResponseEntity.ok(userService.listUsers(
+                PageRequests.of(page, size, sort, UserService.SORTABLE_FIELDS, UserService.DEFAULT_SORT)));
     }
 
     @Operation(summary = "Get user by ID", description = "Returns a single user by their UUID")

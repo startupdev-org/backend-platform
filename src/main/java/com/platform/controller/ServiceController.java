@@ -13,7 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import com.platform.utils.PageRequests;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -65,8 +65,11 @@ public class ServiceController {
             @Parameter(description = "Business UUID", example = "123e4567-e89b-12d3-a456-426614174000")
             @PathVariable UUID businessId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        Page<ServiceResponseDTO> services = providedServicesService.getBusinessServices(businessId, PageRequest.of(page, size));
+            @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "Sort as 'field' or 'field,asc|desc'", example = "price,desc")
+            @RequestParam(required = false) String sort) {
+        Page<ServiceResponseDTO> services = providedServicesService.getBusinessServices(businessId,
+                PageRequests.of(page, size, sort, ProvidedServicesService.SORTABLE_FIELDS, ProvidedServicesService.DEFAULT_SORT));
         return ResponseEntity.ok(services);
     }
 
@@ -78,8 +81,11 @@ public class ServiceController {
             @Parameter(description = "Business UUID", example = "123e4567-e89b-12d3-a456-426614174000")
             @PathVariable UUID businessId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        Page<ServiceResponseDTO> services = providedServicesService.getActiveServices(businessId, PageRequest.of(page, size));
+            @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "Sort as 'field' or 'field,asc|desc'", example = "price,desc")
+            @RequestParam(required = false) String sort) {
+        Page<ServiceResponseDTO> services = providedServicesService.getActiveServices(businessId,
+                PageRequests.of(page, size, sort, ProvidedServicesService.SORTABLE_FIELDS, ProvidedServicesService.DEFAULT_SORT));
         return ResponseEntity.ok(services);
     }
 

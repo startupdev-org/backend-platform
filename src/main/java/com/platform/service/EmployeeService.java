@@ -14,14 +14,15 @@ import com.platform.repository.EmployeeRepository;
 import com.platform.storage.ImageUrlResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -36,6 +37,11 @@ public class EmployeeService {
 
     private static final String BUSINESS_EXCEPTION = "Business not found";
     private static final String EMPLOYEE_NOT_FOUND_EXCEPTION = "Employee not found";
+
+    /** Whitelisted {@code sort} values for the employee list endpoints. */
+    public static final Set<String> SORTABLE_FIELDS =
+            Set.of("firstName", "lastName", "email", "createdAt", "updatedAt");
+    public static final Sort DEFAULT_SORT = Sort.by(Sort.Direction.ASC, "createdAt");
 
     @Transactional
     public EmployeeResponseDTO createEmployee(UUID businessId, EmployeeRequestDTO dto) {
@@ -87,28 +93,13 @@ public class EmployeeService {
     }
 
     public Page<EmployeeResponseDTO> getBusinessEmployees(UUID businessId, Pageable pageable) {
-        List<Employee> employees;
-
-        employees = employeeRepository.findByBusinessIdAndEnabled(businessId, true)
-                .stream()
-                .toList();
-
-        return new PageImpl<>(
-                employees.stream().map(this::toDTO).toList(),
-                pageable,
-                employees.size());
+        return employeeRepository.findByBusinessIdAndEnabled(businessId, true, pageable)
+                .map(this::toDTO);
     }
 
     public Page<EmployeeResponseDTO> getActiveEmployees(UUID businessId, Pageable pageable) {
-        List<Employee> employees = employeeRepository.findByBusinessIdAndEnabled(businessId, true)
-                .stream()
-                .toList();
-
-        return new PageImpl<>(
-                employees.stream().map(this::toDTO).toList(),
-                pageable,
-                employees.size()
-        );
+        return employeeRepository.findByBusinessIdAndEnabled(businessId, true, pageable)
+                .map(this::toDTO);
     }
 
     @Transactional

@@ -4,13 +4,15 @@ import com.platform.dto.business.CreateWorkingHoursRequest;
 import com.platform.dto.business.BusinessWorkingHoursDTO;
 import com.platform.entity.Business;
 import com.platform.entity.BusinessWorkingHours;
+import com.platform.entity.User;
 import com.platform.exception.BadRequestException;
 import com.platform.exception.BusinessException;
 import com.platform.exception.ConflictException;
 import com.platform.exception.ResourceNotFoundException;
 import com.platform.repository.BusinessRepository;
 import com.platform.repository.BusinessWorkingHoursRepository;
-import jakarta.transaction.Transactional;
+import com.platform.utils.BusinessOwnershipValidator;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -30,12 +32,15 @@ public class BusinessWorkingHoursService {
     private static final String WORKING_HOURS_NOT_FOUND = "Working hours not found";
 
     public BusinessWorkingHoursDTO create(UUID businessId,
-                                          CreateWorkingHoursRequest request) {
+                                          CreateWorkingHoursRequest request,
+                                          User currentUser) {
 
         validateTimeRange(request.getOpenTime(), request.getCloseTime());
 
         Business business = businessRepository.findById(businessId)
                 .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_NOT_FOUND));
+
+        BusinessOwnershipValidator.assertOwner(business, currentUser);
 
         validateNoOverlap(
                 businessId,
@@ -79,9 +84,10 @@ public class BusinessWorkingHoursService {
                 .build();
     }
 
-    public BusinessWorkingHours update(UUID businessId,
-                                       Long id,
-                                       CreateWorkingHoursRequest request) {
+    public BusinessWorkingHoursDTO update(UUID businessId,
+                                          Long id,
+                                          CreateWorkingHoursRequest request,
+                                          User currentUser) {
 
         validateTimeRange(request.getOpenTime(), request.getCloseTime());
 
@@ -91,6 +97,8 @@ public class BusinessWorkingHoursService {
         if (!existing.getBusiness().getId().equals(businessId)) {
             throw new BusinessException("Invalid business for this working hours entry");
         }
+
+        BusinessOwnershipValidator.assertOwner(existing.getBusiness(), currentUser);
 
         validateNoOverlap(
                 businessId,
@@ -104,10 +112,10 @@ public class BusinessWorkingHoursService {
         existing.setOpenTime(request.getOpenTime());
         existing.setCloseTime(request.getCloseTime());
 
-        return workingHoursRepository.save(existing);
+        return mapToDTO(workingHoursRepository.save(existing));
     }
 
-    public void delete(UUID businessId, Long id) {
+    public void delete(UUID businessId, Long id, User currentUser) {
 
         BusinessWorkingHours existing = workingHoursRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(WORKING_HOURS_NOT_FOUND));
@@ -115,6 +123,8 @@ public class BusinessWorkingHoursService {
         if (!existing.getBusiness().getId().equals(businessId)) {
             throw new BusinessException("Invalid business for this working hours entry");
         }
+
+        BusinessOwnershipValidator.assertOwner(existing.getBusiness(), currentUser);
 
         workingHoursRepository.delete(existing);
     }

@@ -9,8 +9,8 @@ spring:
   # Deployed environments supply the same keys as real environment variables.
   config:
     import:
-      optional:classpath:secrets.properties
-      optional:file:/etc/secrets/secrets.properties
+      - optional:classpath:secrets.properties
+      - optional:file:/etc/secrets/secrets.properties
 
   datasource:
     url: ${DB_URL}

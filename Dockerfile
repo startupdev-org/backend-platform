@@ -13,7 +13,10 @@ RUN mvn -B clean package -DskipTests
 FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 
-RUN groupadd --system app && useradd --system --gid app app
+# Render mounts secret files (/etc/secrets/*) owned by group 1000; the app user
+# must be in that group to read them. usermod needs root, so run it before USER.
+RUN groupadd --system app && useradd --system --gid app app \
+    && usermod -a -G 1000 app
 COPY --from=build /build/target/*.jar app.jar
 USER app
 

@@ -8,7 +8,9 @@ spring:
   # Local development only: a gitignored file next to this one.
   # Deployed environments supply the same keys as real environment variables.
   config:
-    import: optional:classpath:secrets.properties
+    import:
+      optional:classpath:secrets.properties
+      optional:file:/etc/secrets/secrets.properties
 
   datasource:
     url: ${DB_URL}

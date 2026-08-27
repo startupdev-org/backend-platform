@@ -1,20 +1,24 @@
 package com.platform.controller;
 
+import com.platform.dto.availability.AvailabilityResponseDTO;
 import com.platform.dto.employee.EmployeeRequestDTO;
 import com.platform.dto.employee.EmployeeResponseDTO;
 import com.platform.entity.User;
+import com.platform.service.AvailabilityService;
 import com.platform.service.EmployeeService;
 import com.platform.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import com.platform.utils.PageRequests;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,6 +28,7 @@ import java.util.UUID;
 public class EmployeeController {
 
     private final EmployeeService employeeService;
+    private final AvailabilityService availabilityService;
     private final UserService userService;
 
     @GetMapping
@@ -48,6 +53,18 @@ public class EmployeeController {
     public ResponseEntity<EmployeeResponseDTO> getEmployee(@PathVariable UUID employeeId) {
         EmployeeResponseDTO employee = employeeService.getEmployee(employeeId);
         return ResponseEntity.ok(employee);
+    }
+
+    // Public: the booking page needs bookable start times without a login. Covered by the
+    // GET /api/business/*/employee/** permitAll rule in SecurityConfig.
+    @GetMapping("/{employeeId}/availability")
+    public ResponseEntity<AvailabilityResponseDTO> getEmployeeAvailability(
+            @PathVariable UUID businessId,
+            @PathVariable UUID employeeId,
+            @RequestParam UUID serviceId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return ResponseEntity.ok(
+                availabilityService.getEmployeeAvailability(businessId, employeeId, serviceId, date));
     }
 
     @GetMapping("/{employeeId}/admin")

@@ -71,7 +71,7 @@ Public URLs are built by `R2StorageProvider.toPublicUrl` as `storage.r2.public-u
 
 **Slugs**: `SlugGenerator.generate(name)` produces the unique URL-safe identifier stored on `Business.slug`.
 
-**Time slots**: `TimeSlotGenerator` generates available booking slots based on service duration.
+**Time slots**: `TimeSlotGenerator.generateAvailableSlots(day, durationMinutes, open, close)` turns one opening interval into a 30-minute grid of start times where the whole service still fits before `close`. It knows nothing about working-hours rows or bookings. `AvailabilityService` is the caller: it feeds each `BusinessWorkingHours` interval for the requested weekday through the generator, drops slots taken by a non-cancelled `Booking` and slots in the past, and serves `GET /api/business/{businessId}/employee/{employeeId}/availability?date=&serviceId=` (public — the booking page needs it without a login). A weekday with no working-hours row returns an empty list, not a default grid.
 
 **Enums**: `User.UserRole` is an inner enum on `User`. `Booking.BookingStatus` is an inner enum on `Booking`. `ServiceDeliveryType` and `BusinessCategoryType` are top-level enums stored as `EnumType.STRING` in the DB.
 

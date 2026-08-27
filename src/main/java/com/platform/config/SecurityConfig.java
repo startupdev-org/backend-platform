@@ -122,6 +122,14 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT,    "/api/business/**")              .hasRole(ROLE_BUSINESS_ADMIN)
                         .requestMatchers(HttpMethod.DELETE, "/api/business/**")              .hasRole(ROLE_BUSINESS_ADMIN)
 
+                        // ── 7b. Analytics endpoints ───────────────────────────────────
+                        // Explicit matcher, not the .anyRequest() fallback: the dashboard is
+                        // owner-only data, so the role gate is stated here and the per-business
+                        // ownership check lives in AnalyticsService.
+                        .requestMatchers(HttpMethod.GET, "/api/analytics/**")
+                                .hasAnyRole(ROLE_BUSINESS_ADMIN, ROLE_PLATFORM_ADMIN)
+                        .requestMatchers("/api/analytics/**").denyAll()
+
                         // ── 8. User endpoints ─────────────────────────────────────────
                         // Self-service lives under /me and /whoami; everything else here is
                         // admin-only. The trailing default-deny matters: without it a new

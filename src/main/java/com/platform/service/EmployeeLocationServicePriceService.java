@@ -2,12 +2,15 @@ package com.platform.service;
 
 import com.platform.dto.EmployeeLocationServicePriceRequestDTO;
 import com.platform.dto.EmployeeLocationServicePriceResponseDTO;
+import com.platform.dto.EmployeeServiceAssignmentRequestDTO;
+import com.platform.dto.EmployeeServiceAssignmentResponseDTO;
 import com.platform.entity.Business;
 import com.platform.entity.Employee;
 import com.platform.entity.EmployeeLocationServicePrice;
 import com.platform.entity.Location;
 import com.platform.entity.ProvidedService;
 import com.platform.entity.User;
+import com.platform.exception.BadRequestException;
 import com.platform.exception.BusinessException;
 import com.platform.exception.ResourceNotFoundException;
 import com.platform.repository.BusinessRepository;
@@ -20,8 +23,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -36,6 +43,8 @@ public class EmployeeLocationServicePriceService {
 
     private static final String BUSINESS_NOT_FOUND = "Business not found";
     private static final String PRICE_ENTRY_NOT_FOUND = "Price entry not found";
+    private static final String EMPLOYEE_NOT_FOUND = "Employee not found";
+    private static final String SERVICE_NOT_FOUND = "Service not found";
 
     @Transactional
     public EmployeeLocationServicePriceResponseDTO create(UUID businessId, EmployeeLocationServicePriceRequestDTO dto, User currentUser) {
@@ -54,13 +63,13 @@ public class EmployeeLocationServicePriceService {
         Employee employee = employeeRepository.findById(dto.employeeId())
                 .orElseThrow(() -> {
                     log.error("Employee not found: id={}", dto.employeeId());
-                    return new ResourceNotFoundException("Employee not found");
+                    return new ResourceNotFoundException(EMPLOYEE_NOT_FOUND);
                 });
 
         ProvidedService service = serviceRepository.findById(dto.serviceId())
                 .orElseThrow(() -> {
                     log.error("Service not found: id={}", dto.serviceId());
-                    return new ResourceNotFoundException("Service not found");
+                    return new ResourceNotFoundException(SERVICE_NOT_FOUND);
                 });
 
         Location location = locationRepository.findById(dto.locationId())
@@ -81,6 +90,121 @@ public class EmployeeLocationServicePriceService {
         entity = priceRepository.save(entity);
         log.info("Created price entry id={} with price={}", entity.getId(), entity.getPrice());
         return toDTO(entity);
+    }
+
+    /**
+     * Makes an employee bookable for a set of services without hand-building the join rows.
+     *
+     * <p>Whether an employee can perform a service is not a flag - it is the existence of an
+     * (employee, service, location) row, which is also where the price lives. Elegant, but it
+     * means the simplest possible business cannot take a booking until someone builds that row
+     * by hand ({@code BookingService.createBooking} hard-fails without it). This is the
+     * convenience path over that model: one call, base price, no pricing decisions. See BP-50.
+     *
+     * <p><b>Locations.</b> An {@link Employee} has no location of its own - it belongs to a
+     * business, nothing narrower - so "across their locations" can only mean every location of
+     * the business, and a row is created per location. A business with no locations at all is a
+     * real precondition failure, not a silent no-op: the caller gets a 400 telling them to add a
+     * location first.
+     *
+     * <p><b>Idempotency.</b> Re-posting the same service ids is a success, not a 409. Rows that
+     * already exist are left exactly as they are - so a per-employee override is never reset to
+     * base price by a re-assign - and only the missing ones are inserted. The existing rows are
+     * read in one query rather than one per pair.
+     *
+     * <p><b>Under concurrency</b> the unique constraint stays the final authority: two calls that
+     * race past the pre-check both insert, one gets a {@code DataIntegrityViolationException}
+     * (→ 409, mapped globally) and its whole transaction rolls back. That is safe to retry - the
+     * retry sees the winner's rows and returns 200 with {@code createdCount} at zero. The
+     * pre-check is what makes the ordinary repeat call cheap and quiet, not what makes the
+     * constraint redundant.
+     *
+     * <p>Prices are never taken from the request body here; the explicit override endpoints
+     * ({@link #create} / {@link #update}) remain the only way to set a non-base price.
+     */
+    @Transactional
+    public EmployeeServiceAssignmentResponseDTO assignServicesAtBasePrice(
+            UUID businessId, UUID employeeId, EmployeeServiceAssignmentRequestDTO dto, User currentUser) {
+
+        log.info("Assigning {} service(s) at base price to employeeId={} of businessId={}",
+                dto.serviceIds().size(), employeeId, businessId);
+
+        Business business = loadBusinessAndValidateOwnership(businessId, currentUser);
+
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> {
+                    log.error("Employee not found: id={}", employeeId);
+                    return new ResourceNotFoundException(EMPLOYEE_NOT_FOUND);
+                });
+
+        List<Location> locations = locationRepository.findByBusinessId(businessId);
+        if (locations.isEmpty()) {
+            throw new BadRequestException(
+                    "This business has no locations yet. Create at least one location before "
+                            + "assigning services to an employee.");
+        }
+
+        // Distinct, order-preserving: a repeated id in the body must not try to insert twice.
+        List<UUID> serviceIds = dto.serviceIds().stream().distinct().toList();
+
+        // Resolve and validate everything before writing anything, so a service belonging to
+        // another tenant is rejected outright rather than half-applied.
+        List<ProvidedService> services = serviceIds.stream()
+                .map(serviceId -> serviceRepository.findById(serviceId)
+                        .orElseThrow(() -> {
+                            log.error("Service not found: id={}", serviceId);
+                            return new ResourceNotFoundException(SERVICE_NOT_FOUND);
+                        }))
+                .toList();
+
+        for (ProvidedService service : services) {
+            for (Location location : locations) {
+                validateSameBusiness(business, employee, service, location);
+            }
+        }
+
+        // One query for what already exists, keyed by (service, location) - not one per pair.
+        Map<List<UUID>, EmployeeLocationServicePrice> existing = priceRepository.findByEmployeeId(employeeId)
+                .stream()
+                .collect(Collectors.toMap(
+                        p -> List.of(p.getService().getId(), p.getLocation().getId()),
+                        p -> p,
+                        (a, b) -> a));
+
+        List<EmployeeLocationServicePrice> toCreate = new ArrayList<>();
+        List<EmployeeLocationServicePrice> alreadyAssigned = new ArrayList<>();
+
+        for (ProvidedService service : services) {
+            for (Location location : locations) {
+                EmployeeLocationServicePrice current = existing.get(List.of(service.getId(), location.getId()));
+                if (current != null) {
+                    // Left untouched on purpose: a per-employee override must survive a re-assign.
+                    alreadyAssigned.add(current);
+                    continue;
+                }
+                toCreate.add(EmployeeLocationServicePrice.builder()
+                        .employee(employee)
+                        .service(service)
+                        .location(location)
+                        .price(service.getPrice())
+                        .build());
+            }
+        }
+
+        List<EmployeeLocationServicePrice> created = toCreate.isEmpty()
+                ? List.of()
+                : priceRepository.saveAll(toCreate);
+
+        log.info("Assigned services to employeeId={}: {} row(s) created, {} already present",
+                employeeId, created.size(), alreadyAssigned.size());
+
+        List<EmployeeLocationServicePriceResponseDTO> assignments =
+                Stream.concat(created.stream(), alreadyAssigned.stream())
+                        .map(this::toDTO)
+                        .toList();
+
+        return new EmployeeServiceAssignmentResponseDTO(
+                employeeId, created.size(), alreadyAssigned.size(), assignments);
     }
 
     @Transactional
@@ -106,9 +230,9 @@ public class EmployeeLocationServicePriceService {
 
         if (combinationChanged) {
             Employee employee = employeeRepository.findById(dto.employeeId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException(EMPLOYEE_NOT_FOUND));
             ProvidedService service = serviceRepository.findById(dto.serviceId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Service not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException(SERVICE_NOT_FOUND));
             Location location = locationRepository.findById(dto.locationId())
                     .orElseThrow(() -> new ResourceNotFoundException("Location not found"));
 
@@ -185,9 +309,9 @@ public class EmployeeLocationServicePriceService {
 
     private void validateEmployeeBelongsToBusiness(UUID businessId, UUID employeeId) {
         Employee employee = employeeRepository.findById(employeeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(EMPLOYEE_NOT_FOUND));
         if (!employee.getBusiness().getId().equals(businessId)) {
-            throw new ResourceNotFoundException("Employee not found");
+            throw new ResourceNotFoundException(EMPLOYEE_NOT_FOUND);
         }
     }
 

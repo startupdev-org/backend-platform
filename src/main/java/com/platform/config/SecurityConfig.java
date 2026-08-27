@@ -101,6 +101,13 @@ public class SecurityConfig {
                         // ── 3. Employee endpoints ─────────────────────────────────────
                         // Write operations → BUSINESS_ADMIN only
                         .requestMatchers(HttpMethod.POST,   "/api/business/*/employee")      .hasRole(ROLE_BUSINESS_ADMIN)
+                        // Assigning services to an employee at base price (BP-50). Stated
+                        // explicitly rather than left to the /api/business/** catch-all in
+                        // section 7: the rule for a write this significant should be readable
+                        // next to the other employee writes, not inferred three sections down.
+                        // BUSINESS_ADMIN only, matching the employee-service-price POST it
+                        // creates rows in and the create-employee POST above.
+                        .requestMatchers(HttpMethod.POST,   "/api/business/*/employee/*/services").hasRole(ROLE_BUSINESS_ADMIN)
                         .requestMatchers(HttpMethod.PUT,    "/api/business/*/employee/**")   .hasAnyRole(ROLE_BUSINESS_ADMIN, ROLE_PLATFORM_ADMIN)
                         // Platform-admin-only: permanent delete and disabled-employee lookup
                         // (must precede the general DELETE/GET employee rules below — first match wins)

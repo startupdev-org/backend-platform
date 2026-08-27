@@ -6,16 +6,19 @@ import com.platform.entity.User;
 import com.platform.service.ReviewService;
 import com.platform.service.UserService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
 
 @RestController
+@Validated   // makes the @Size on the reply request param below take effect
 @RequestMapping("/api/review")
 @RequiredArgsConstructor
 public class ReviewController {
@@ -46,7 +49,7 @@ public class ReviewController {
     @PatchMapping("/{id}/reply")
     public ResponseEntity<ReviewResponseDTO> addBusinessReply(
             @PathVariable UUID id,
-            @RequestParam String reply,
+            @RequestParam @Size(max = 1000, message = "Reply must not exceed 1000 characters") String reply,
             Authentication authentication) {
         User currentUser = userService.getUserByUsername(authentication.getName());
         ReviewResponseDTO review = reviewService.addBusinessReply(id, reply, currentUser);

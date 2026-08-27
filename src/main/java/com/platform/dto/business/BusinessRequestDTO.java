@@ -3,6 +3,7 @@ package com.platform.dto.business;
 import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.hibernate.validator.constraints.URL;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -31,6 +32,8 @@ public class BusinessRequestDTO {
     private String phone;
 
     @Nullable
+    @URL(message = "Website must be a valid URL")
+    @Size(max = 255, message = "Website must not exceed 255 characters")
     private String website;
 
     // No image fields here on purpose. Logo and cover change only through

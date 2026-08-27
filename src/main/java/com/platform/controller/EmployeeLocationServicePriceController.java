@@ -5,6 +5,7 @@ import com.platform.dto.EmployeeLocationServicePriceResponseDTO;
 import com.platform.entity.User;
 import com.platform.service.EmployeeLocationServicePriceService;
 import com.platform.service.UserService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,7 +26,7 @@ public class EmployeeLocationServicePriceController {
     @PostMapping
     public ResponseEntity<EmployeeLocationServicePriceResponseDTO> create(
             @PathVariable UUID businessId,
-            @RequestBody EmployeeLocationServicePriceRequestDTO dto,
+            @Valid @RequestBody EmployeeLocationServicePriceRequestDTO dto,
             Authentication authentication) {
         User currentUser = userService.getUserByUsername(authentication.getName());
         return ResponseEntity.status(HttpStatus.CREATED).body(priceService.create(businessId, dto, currentUser));
@@ -35,7 +36,7 @@ public class EmployeeLocationServicePriceController {
     public ResponseEntity<EmployeeLocationServicePriceResponseDTO> update(
             @PathVariable UUID businessId,
             @PathVariable UUID id,
-            @RequestBody EmployeeLocationServicePriceRequestDTO dto,
+            @Valid @RequestBody EmployeeLocationServicePriceRequestDTO dto,
             Authentication authentication) {
         User currentUser = userService.getUserByUsername(authentication.getName());
         return ResponseEntity.ok(priceService.update(businessId, id, dto, currentUser));

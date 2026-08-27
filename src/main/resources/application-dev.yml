@@ -4,6 +4,11 @@ spring:
   jpa:
     show-sql: true
 
+# Loose throttle locally so manual testing isn't blocked, but the filter still runs.
+rate-limit:
+  capacity: 100
+  refill-tokens: 100
+
 logging:
   level:
     com.platform: DEBUG

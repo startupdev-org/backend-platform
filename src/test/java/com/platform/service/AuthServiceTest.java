@@ -3,7 +3,9 @@ package com.platform.service;
 import com.platform.dto.auth.LoginRequest;
 import com.platform.dto.auth.LoginResponse;
 import com.platform.dto.auth.RegisterRequest;
+import com.platform.config.RateLimitProperties;
 import com.platform.entity.User;
+import com.platform.exception.AccountLockedException;
 import com.platform.exception.EmailAlreadyRegisteredException;
 import com.platform.exception.InvalidCredentialsException;
 import com.platform.repository.UserRepository;
@@ -14,10 +16,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -41,8 +45,14 @@ class AuthServiceTest {
     @Mock
     private JwtUtils jwtUtils;
 
+    // Real config with production defaults (lockout after 5, base 15 min).
+    @Spy
+    private RateLimitProperties rateLimitProperties = new RateLimitProperties();
+
     @Captor
     private ArgumentCaptor<User> userCaptor;
+
+    private static final String IP = "203.0.113.7";
 
     private RegisterRequest registerRequest(String email) {
         RegisterRequest request = new RegisterRequest();
@@ -163,7 +173,7 @@ class AuthServiceTest {
         when(passwordEncoder.matches("password123", "encodedPassword")).thenReturn(true);
         when(jwtUtils.generateToken(user)).thenReturn("jwt-token");
 
-        LoginResponse response = authService.login(request);
+        LoginResponse response = authService.login(request, IP);
 
         assertEquals("test@example.com", response.getEmail());
         assertEquals("jwt-token", response.getAccessToken());
@@ -181,7 +191,7 @@ class AuthServiceTest {
         when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
         when(jwtUtils.generateToken(user)).thenReturn("jwt-token");
 
-        assertEquals("test@example.com", authService.login(request).getEmail());
+        assertEquals("test@example.com", authService.login(request, IP).getEmail());
     }
 
     @Test
@@ -193,8 +203,9 @@ class AuthServiceTest {
         when(userRepository.findByEmailIgnoreCase("missing@example.com")).thenReturn(Optional.empty());
 
         InvalidCredentialsException ex = assertThrows(InvalidCredentialsException.class,
-                () -> authService.login(request));
+                () -> authService.login(request, IP));
         assertEquals("Invalid credentials", ex.getMessage());
+        assertEquals(IP, ex.getClientIp());
     }
 
     @Test
@@ -208,10 +219,105 @@ class AuthServiceTest {
         when(passwordEncoder.matches("wrongPassword", "encodedPassword")).thenReturn(false);
 
         InvalidCredentialsException ex = assertThrows(InvalidCredentialsException.class,
-                () -> authService.login(request));
+                () -> authService.login(request, IP));
 
         // Identical to the unknown-email message: distinguishing them would make this
         // endpoint a user-enumeration oracle.
         assertEquals("Invalid credentials", ex.getMessage());
+    }
+
+    // ── lockout ───────────────────────────────────────────────────────────────
+
+    @Test
+    void login_failedPassword_incrementsCounter() {
+        LoginRequest request = new LoginRequest();
+        request.setEmail("test@example.com");
+        request.setPassword("wrongPassword");
+
+        User user = persistedUser("test@example.com");
+        user.setFailedLoginAttempts(2);
+        when(userRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
+
+        assertThrows(InvalidCredentialsException.class, () -> authService.login(request, IP));
+
+        verify(userRepository).saveAndFlush(userCaptor.capture());
+        assertEquals(3, userCaptor.getValue().getFailedLoginAttempts());
+        assertNull(userCaptor.getValue().getLockedUntil(), "not locked before the threshold");
+    }
+
+    @Test
+    void login_reachingThreshold_locksAccount() {
+        LoginRequest request = new LoginRequest();
+        request.setEmail("test@example.com");
+        request.setPassword("wrongPassword");
+
+        User user = persistedUser("test@example.com");
+        user.setFailedLoginAttempts(4); // 5th failure trips the default threshold
+        when(userRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
+
+        assertThrows(InvalidCredentialsException.class, () -> authService.login(request, IP));
+
+        verify(userRepository).saveAndFlush(userCaptor.capture());
+        assertEquals(5, userCaptor.getValue().getFailedLoginAttempts());
+        assertNotNull(userCaptor.getValue().getLockedUntil());
+        assertTrue(userCaptor.getValue().getLockedUntil().isAfter(LocalDateTime.now()));
+    }
+
+    @Test
+    void login_whileLocked_throwsAccountLockedWithoutCheckingPassword() {
+        LoginRequest request = new LoginRequest();
+        request.setEmail("test@example.com");
+        request.setPassword("password123");
+
+        User user = persistedUser("test@example.com");
+        user.setFailedLoginAttempts(5);
+        user.setLockedUntil(LocalDateTime.now().plusMinutes(10));
+        when(userRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(user));
+
+        AccountLockedException ex = assertThrows(AccountLockedException.class,
+                () -> authService.login(request, IP));
+        assertEquals(IP, ex.getClientIp());
+        assertTrue(ex.getRetryAfterSeconds() > 0);
+        verifyNoInteractions(passwordEncoder);
+        verify(userRepository, never()).saveAndFlush(any(User.class));
+    }
+
+    @Test
+    void login_expiredLock_allowsLoginAndClearsCounter() {
+        LoginRequest request = new LoginRequest();
+        request.setEmail("test@example.com");
+        request.setPassword("password123");
+
+        User user = persistedUser("test@example.com");
+        user.setFailedLoginAttempts(6);
+        user.setLockedUntil(LocalDateTime.now().minusMinutes(1)); // lock already expired
+        when(userRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("password123", "encodedPassword")).thenReturn(true);
+        when(jwtUtils.generateToken(user)).thenReturn("jwt-token");
+
+        LoginResponse response = authService.login(request, IP);
+
+        assertEquals("jwt-token", response.getAccessToken());
+        verify(userRepository).saveAndFlush(userCaptor.capture());
+        assertEquals(0, userCaptor.getValue().getFailedLoginAttempts());
+        assertNull(userCaptor.getValue().getLockedUntil());
+    }
+
+    @Test
+    void login_success_withCleanCounter_doesNotWrite() {
+        LoginRequest request = new LoginRequest();
+        request.setEmail("test@example.com");
+        request.setPassword("password123");
+
+        User user = persistedUser("test@example.com");
+        when(userRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("password123", "encodedPassword")).thenReturn(true);
+        when(jwtUtils.generateToken(user)).thenReturn("jwt-token");
+
+        authService.login(request, IP);
+
+        verify(userRepository, never()).saveAndFlush(any(User.class));
     }
 }

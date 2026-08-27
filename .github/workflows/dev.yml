@@ -36,5 +36,24 @@ jobs:
           context: .
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
+
+      - name: Check Render service status
+        id: render-status
+        run: |
+          RESPONSE=$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}")
+
+          SUSPENDED=$(echo "$RESPONSE" | jq -r '.suspended')
+
+          echo "Service status: $SUSPENDED"
+
+          if [ "$SUSPENDED" = "suspended" ]; then
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Deploy on Render
+        if: steps.render-status.outputs.should_deploy == 'true'
         run: curl --fail --silent --show-error "$DEPLOY_URL"

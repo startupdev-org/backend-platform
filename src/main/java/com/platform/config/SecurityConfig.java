@@ -1,6 +1,7 @@
 package com.platform.config;
 
 import com.platform.security.JwtAuthenticationFilter;
+import com.platform.security.RateLimitFilter;
 import com.platform.security.RestAccessDeniedHandler;
 import com.platform.security.RestAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final RateLimitFilter rateLimitFilter;
     private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
     private final RestAccessDeniedHandler restAccessDeniedHandler;
 
@@ -35,7 +37,9 @@ public class SecurityConfig {
     private static final String ROLE_BUSINESS_ADMIN = "BUSINESS_ADMIN";
 
     // ── Public endpoints ──────────────────────────────────────────────────────
-    private static final String[] PUBLIC_POST_PATTERNS   = { "/api/auth/**" };
+    // Specific paths, not "/api/auth/**": a new POST under /api/auth is then
+    // authenticated by default and made public only by an explicit edit here.
+    private static final String[] PUBLIC_POST_PATTERNS   = { "/api/auth/login", "/api/auth/register" };
     private static final String[] PUBLIC_GET_PATTERNS    = {
             "/api/health/**",
             "/swagger-ui/**",
@@ -143,7 +147,10 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(restAuthenticationEntryPoint)
                         .accessDeniedHandler(restAccessDeniedHandler))
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                // Throttle the public auth endpoints before any auth work happens. CORS runs
+                // earlier in the chain, so a 429 still carries CORS headers.
+                .addFilterBefore(rateLimitFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }

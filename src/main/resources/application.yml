@@ -66,6 +66,21 @@ storage:
     public-url-base: ${R2_PUBLIC_URL_BASE:}
 
 
+# Abuse controls on the public auth endpoints. The per-IP throttle is in-memory
+# (per-instance); lockout is per-account and DB-backed.
+rate-limit:
+  enabled: true
+  capacity: 10
+  refill-tokens: 10
+  refill-period-seconds: 60
+  cache-expire-minutes: 15
+  cache-max-size: 100000
+  lockout:
+    enabled: true
+    max-failed-attempts: 5
+    base-minutes: 15
+    max-minutes: 1440
+
 logging:
   level:
     root: INFO

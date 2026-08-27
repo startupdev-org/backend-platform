@@ -2,6 +2,7 @@ package com.platform.exception;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -57,8 +58,33 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleInvalidCredentials(
             InvalidCredentialsException ex, WebRequest request) {
-        log.warn("Failed login attempt at {}", path(request));
+        log.warn("Failed login attempt email={} ip={} path={}",
+                ex.getEmail(), ex.getClientIp(), path(request));
         return build(HttpStatus.UNAUTHORIZED, "Invalid credentials", request);
+    }
+
+    // ── 429 ───────────────────────────────────────────────────────────────────
+
+    // Too many consecutive failed logins for this account. Distinct from the 401 above so
+    // the client can show a "locked, try later" message; Retry-After carries the wait.
+    // The per-IP request throttle (RateLimitFilter) also returns 429 but writes its own
+    // body - it runs before dispatch, out of this advice's reach.
+    @ExceptionHandler(AccountLockedException.class)
+    public ResponseEntity<ErrorResponse> handleAccountLocked(
+            AccountLockedException ex, WebRequest request) {
+        log.warn("Login blocked: account locked email={} ip={} path={}",
+                ex.getEmail(), ex.getClientIp(), path(request));
+        ErrorResponse body = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.TOO_MANY_REQUESTS.value())
+                .error(HttpStatus.TOO_MANY_REQUESTS.getReasonPhrase())
+                .message("Account temporarily locked due to repeated failed login attempts. "
+                        + "Please try again later.")
+                .path(path(request))
+                .build();
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
+                .body(body);
     }
 
     // Reached when a token is well-formed and signed but its user no longer exists, and

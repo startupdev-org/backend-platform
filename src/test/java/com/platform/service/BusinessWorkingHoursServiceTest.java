@@ -3,9 +3,6 @@ package com.platform.service;
 import static org.junit.jupiter.api.Assertions.*;
 
 
-import com.platform.dto.auth.LoginRequest;
-import com.platform.dto.auth.LoginResponse;
-import com.platform.dto.auth.RegisterRequest;
 import com.platform.dto.business.BusinessWorkingHoursDTO;
 import com.platform.dto.business.CreateWorkingHoursRequest;
 import com.platform.entity.Business;
@@ -44,13 +41,26 @@ class BusinessWorkingHoursServiceTest {
     @Mock
     private BusinessWorkingHoursRepository workingHoursRepository;
 
+    private User owner;
+    private User otherUser;
     private Business business;
 
     @BeforeEach
     void setUp() {
+        owner = User.builder()
+                .id(UUID.randomUUID())
+                .email("owner@gmail.com")
+                .role(User.UserRole.BUSINESS_ADMIN)
+                .build();
+        otherUser = User.builder()
+                .id(UUID.randomUUID())
+                .email("other@gmail.com")
+                .role(User.UserRole.BUSINESS_ADMIN)
+                .build();
         business = Business.builder()
                 .id(UUID.randomUUID())
                 .name("Test Business")
+                .owner(owner)
                 .build();
     }
 
@@ -72,7 +82,7 @@ class BusinessWorkingHoursServiceTest {
 
         when(workingHoursRepository.save(any(BusinessWorkingHours.class))).thenReturn(saved);
 
-        BusinessWorkingHoursDTO result = service.create(business.getId(), request);
+        BusinessWorkingHoursDTO result = service.create(business.getId(), request, owner);
 
         assertNotNull(result);
         assertEquals(DayOfWeek.MONDAY, result.getDayOfWeek());
@@ -83,6 +93,22 @@ class BusinessWorkingHoursServiceTest {
     }
 
     @Test
+    void create_notOwner_throwsBusinessException() {
+        CreateWorkingHoursRequest request = new CreateWorkingHoursRequest();
+        request.setDayOfWeek(DayOfWeek.MONDAY);
+        request.setOpenTime(LocalTime.of(9, 0));
+        request.setCloseTime(LocalTime.of(17, 0));
+
+        when(businessRepository.findById(business.getId())).thenReturn(Optional.of(business));
+
+        assertThrows(BusinessException.class, () ->
+                service.create(business.getId(), request, otherUser)
+        );
+
+        verify(workingHoursRepository, never()).save(any());
+    }
+
+    @Test
     void create_shouldThrowWhenOpenAfterClose() {
         CreateWorkingHoursRequest request = new CreateWorkingHoursRequest();
         request.setDayOfWeek(DayOfWeek.TUESDAY);
@@ -90,7 +116,7 @@ class BusinessWorkingHoursServiceTest {
         request.setCloseTime(LocalTime.of(9, 0));
 
         Exception exception = assertThrows(BadRequestException.class, () ->
-                service.create(business.getId(), request)
+                service.create(business.getId(), request, owner)
         );
 
         assertEquals("Open time must be before close time", exception.getMessage());
@@ -116,7 +142,7 @@ class BusinessWorkingHoursServiceTest {
                 .thenReturn(List.of(existing));
 
         Exception exception = assertThrows(ConflictException.class, () ->
-                service.create(business.getId(), request)
+                service.create(business.getId(), request, owner)
         );
 
         assertEquals("Working hours overlap with existing interval", exception.getMessage());
@@ -132,7 +158,7 @@ class BusinessWorkingHoursServiceTest {
         when(businessRepository.findById(business.getId())).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () ->
-                service.create(business.getId(), request)
+                service.create(business.getId(), request, owner)
         );
 
         verify(workingHoursRepository, never()).save(any());
@@ -175,10 +201,31 @@ class BusinessWorkingHoursServiceTest {
                 .thenReturn(Collections.emptyList());
         when(workingHoursRepository.save(existing)).thenReturn(existing);
 
-        BusinessWorkingHours updated = service.update(business.getId(), 1L, request);
+        BusinessWorkingHoursDTO updated = service.update(business.getId(), 1L, request, owner);
 
         assertEquals(LocalTime.of(10, 0), updated.getOpenTime());
         assertEquals(LocalTime.of(18, 0), updated.getCloseTime());
+    }
+
+    @Test
+    void update_notOwner_throwsBusinessException() {
+        BusinessWorkingHours existing = new BusinessWorkingHours(
+                business, DayOfWeek.MONDAY,
+                LocalTime.of(9, 0), LocalTime.of(17, 0));
+        existing.setId(1L);
+
+        CreateWorkingHoursRequest request = new CreateWorkingHoursRequest();
+        request.setDayOfWeek(DayOfWeek.MONDAY);
+        request.setOpenTime(LocalTime.of(10, 0));
+        request.setCloseTime(LocalTime.of(18, 0));
+
+        when(workingHoursRepository.findById(1L)).thenReturn(Optional.of(existing));
+
+        assertThrows(BusinessException.class, () ->
+                service.update(business.getId(), 1L, request, otherUser)
+        );
+
+        verify(workingHoursRepository, never()).save(any());
     }
 
     @Test
@@ -191,7 +238,7 @@ class BusinessWorkingHoursServiceTest {
         when(workingHoursRepository.findById(1L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () ->
-                service.update(business.getId(), 1L, request)
+                service.update(business.getId(), 1L, request, owner)
         );
 
         verify(workingHoursRepository, never()).save(any());
@@ -206,9 +253,25 @@ class BusinessWorkingHoursServiceTest {
 
         when(workingHoursRepository.findById(1L)).thenReturn(Optional.of(existing));
 
-        service.delete(business.getId(), 1L);
+        service.delete(business.getId(), 1L, owner);
 
         verify(workingHoursRepository, times(1)).delete(existing);
+    }
+
+    @Test
+    void delete_notOwner_throwsBusinessException() {
+        BusinessWorkingHours existing = new BusinessWorkingHours(
+                business, DayOfWeek.FRIDAY,
+                LocalTime.of(9, 0), LocalTime.of(17, 0));
+        existing.setId(1L);
+
+        when(workingHoursRepository.findById(1L)).thenReturn(Optional.of(existing));
+
+        assertThrows(BusinessException.class, () ->
+                service.delete(business.getId(), 1L, otherUser)
+        );
+
+        verify(workingHoursRepository, never()).delete(any());
     }
 
     @Test
@@ -221,7 +284,7 @@ class BusinessWorkingHoursServiceTest {
 
         when(workingHoursRepository.findById(1L)).thenReturn(Optional.of(existing));
 
-        assertThrows(BusinessException.class, () -> service.delete(business.getId(), 1L));
+        assertThrows(BusinessException.class, () -> service.delete(business.getId(), 1L, owner));
     }
 
     @Test
@@ -229,7 +292,7 @@ class BusinessWorkingHoursServiceTest {
         when(workingHoursRepository.findById(1L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () ->
-                service.delete(business.getId(), 1L)
+                service.delete(business.getId(), 1L, owner)
         );
 
         verify(workingHoursRepository, never()).delete(any());

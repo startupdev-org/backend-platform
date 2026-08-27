@@ -86,9 +86,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET,    "/api/business/*/employee")      .permitAll()
 
                         // ── 4. Working-hours endpoints ────────────────────────────────
-                        .requestMatchers(HttpMethod.GET,    "/api/business/*/working-hours") .authenticated()
-                        .requestMatchers(HttpMethod.POST,   "/api/business/*/working-hours") .hasRole(ROLE_BUSINESS_ADMIN)
-                        .requestMatchers(HttpMethod.DELETE, "/api/business/*/working-hours") .hasRole(ROLE_BUSINESS_ADMIN)
+                        .requestMatchers(HttpMethod.GET,    "/api/business/*/working-hours")    .authenticated()
+                        .requestMatchers(HttpMethod.POST,   "/api/business/*/working-hours")    .hasRole(ROLE_BUSINESS_ADMIN)
+                        .requestMatchers(HttpMethod.PUT,    "/api/business/*/working-hours/**") .hasRole(ROLE_BUSINESS_ADMIN)
+                        .requestMatchers(HttpMethod.DELETE, "/api/business/*/working-hours/**") .hasRole(ROLE_BUSINESS_ADMIN)
 
                         // ── 5. Features endpoints ─────────────────────────────────────
                         .requestMatchers(HttpMethod.GET,    "/api/business/*/features")      .authenticated()

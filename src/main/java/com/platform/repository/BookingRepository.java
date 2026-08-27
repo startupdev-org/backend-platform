@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -37,6 +38,16 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @Query(LIST_FETCH_GRAPH + "WHERE p.employee.id = :employeeId AND b.status = :status")
     List<Booking> findByEmployeeIdAndStatusForListing(
             @Param("employeeId") UUID employeeId,
+            @Param("status") Booking.BookingStatus status);
+
+    // Business-scoped listing: a BUSINESS_ADMIN sees only their own businesses'
+    // bookings, never the whole table. See BP-29.
+    @Query(LIST_FETCH_GRAPH + "WHERE p.employee.business.id IN :businessIds")
+    List<Booking> findByBusinessIdInForListing(@Param("businessIds") Collection<UUID> businessIds);
+
+    @Query(LIST_FETCH_GRAPH + "WHERE p.employee.business.id IN :businessIds AND b.status = :status")
+    List<Booking> findByBusinessIdInAndStatusForListing(
+            @Param("businessIds") Collection<UUID> businessIds,
             @Param("status") Booking.BookingStatus status);
 
     @Query("SELECT b FROM Booking b WHERE b.priceEntry.employee.id = :employeeId")

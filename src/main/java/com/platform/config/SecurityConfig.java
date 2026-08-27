@@ -149,8 +149,17 @@ public class SecurityConfig {
 
 
                         // ── 9. Booking & Review endpoints ─────────────────────────────
+                        // POST /api/booking is the customer-facing create path; it stays
+                        // authenticated here until the public booking flow opens it (BP-46).
+                        // Every other booking route is management data: reads and mutations
+                        // are role-gated here and ownership-scoped in BookingService (BP-29).
+                        // PATCH and DELETE are stated explicitly rather than left to the
+                        // .anyRequest() fallback, which would let any authenticated account
+                        // re-status or cancel anyone's booking.
                         .requestMatchers(HttpMethod.POST,   "/api/booking")                  .authenticated()
-                        .requestMatchers(HttpMethod.GET,    "/api/booking/**")               .authenticated()
+                        .requestMatchers(HttpMethod.PATCH,  "/api/booking/*/status")         .hasAnyRole(ROLE_BUSINESS_ADMIN, ROLE_PLATFORM_ADMIN)
+                        .requestMatchers(HttpMethod.DELETE, "/api/booking/*")                .hasAnyRole(ROLE_BUSINESS_ADMIN, ROLE_PLATFORM_ADMIN)
+                        .requestMatchers(HttpMethod.GET,    "/api/booking/**")               .hasAnyRole(ROLE_BUSINESS_ADMIN, ROLE_PLATFORM_ADMIN)
                         .requestMatchers(HttpMethod.POST,   "/api/review/booking/**")        .authenticated()
                         .requestMatchers(HttpMethod.GET,    "/api/review/business/**")       .authenticated()
 

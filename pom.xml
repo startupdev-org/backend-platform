@@ -84,6 +84,19 @@
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
 
+        <!-- Per-IP rate limiting on the public auth endpoints. In-memory token buckets
+             (bucket4j) held in a size-bounded, self-evicting cache (caffeine). Single
+             Render instance today; a scale-out would need a shared store. -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j_jdk17-core</artifactId>
+            <version>8.14.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
         <!-- DevTools -->
 
         <!-- Flyway - owns the DB schema in every environment -->

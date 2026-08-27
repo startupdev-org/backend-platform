@@ -4,9 +4,11 @@ import com.platform.dto.auth.LoginRequest;
 import com.platform.dto.auth.LoginResponse;
 import com.platform.dto.auth.RegisterRequest;
 import com.platform.service.AuthService;
+import com.platform.utils.ClientIpResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -35,9 +37,11 @@ public class AuthController {
     @ApiResponse(responseCode = "200", description = "Login successful")
     @ApiResponse(responseCode = "400", description = "Invalid request body")
     @ApiResponse(responseCode = "401", description = "Invalid email or password")
+    @ApiResponse(responseCode = "429", description = "Account temporarily locked, or too many attempts from this IP")
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        LoginResponse response = authService.login(request);
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request,
+                                               HttpServletRequest httpRequest) {
+        LoginResponse response = authService.login(request, ClientIpResolver.resolve(httpRequest));
         return ResponseEntity.ok(response);
     }
 }

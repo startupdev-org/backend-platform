@@ -1,9 +1,11 @@
 package com.platform.service;
 
+import com.platform.config.RateLimitProperties;
 import com.platform.dto.auth.LoginRequest;
 import com.platform.dto.auth.LoginResponse;
 import com.platform.dto.auth.RegisterRequest;
 import com.platform.entity.User;
+import com.platform.exception.AccountLockedException;
 import com.platform.exception.EmailAlreadyRegisteredException;
 import com.platform.exception.InvalidCredentialsException;
 import com.platform.repository.UserRepository;
@@ -14,6 +16,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
+
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -21,6 +26,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
+    private final RateLimitProperties rateLimitProperties;
 
     @Transactional
     public LoginResponse register(RegisterRequest request) {
@@ -52,17 +58,56 @@ public class AuthService {
         return LoginResponse.fromUser(user, jwtUtils.generateToken(user));
     }
 
-    public LoginResponse login(LoginRequest request) {
+    /**
+     * @param clientIp source IP of the attempt, for the failed-login audit log. May be null.
+     */
+    @Transactional
+    public LoginResponse login(LoginRequest request, String clientIp) {
+        String email = UserService.normalizeEmail(request.getEmail());
+
         // Both failure paths throw the same exception with the same message. Distinguishing
         // "no such user" from "wrong password" turns this endpoint into a user-enumeration
         // oracle.
-        User user = userRepository.findByEmailIgnoreCase(UserService.normalizeEmail(request.getEmail()))
-                .orElseThrow(() -> new InvalidCredentialsException("Invalid credentials"));
+        User user = userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new InvalidCredentialsException("Invalid credentials", email, clientIp));
+
+        RateLimitProperties.Lockout lockout = rateLimitProperties.getLockout();
+
+        if (lockout.isEnabled() && user.getLockedUntil() != null
+                && user.getLockedUntil().isAfter(LocalDateTime.now())) {
+            long retryAfter = Math.max(1,
+                    Duration.between(LocalDateTime.now(), user.getLockedUntil()).toSeconds());
+            throw new AccountLockedException(
+                    "Account temporarily locked due to repeated failed login attempts",
+                    email, clientIp, retryAfter);
+        }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new InvalidCredentialsException("Invalid credentials");
+            registerFailedAttempt(user, lockout);
+            throw new InvalidCredentialsException("Invalid credentials", email, clientIp);
+        }
+
+        if (user.getFailedLoginAttempts() != 0 || user.getLockedUntil() != null) {
+            user.setFailedLoginAttempts(0);
+            user.setLockedUntil(null);
+            userRepository.saveAndFlush(user);
         }
 
         return LoginResponse.fromUser(user, jwtUtils.generateToken(user));
+    }
+
+    private void registerFailedAttempt(User user, RateLimitProperties.Lockout lockout) {
+        int attempts = user.getFailedLoginAttempts() + 1;
+        user.setFailedLoginAttempts(attempts);
+
+        if (lockout.isEnabled() && attempts >= lockout.getMaxFailedAttempts()) {
+            int overshoot = attempts - lockout.getMaxFailedAttempts();
+            long minutes = Math.min(
+                    lockout.getMaxMinutes(),
+                    lockout.getBaseMinutes() << Math.min(overshoot, 20));
+            user.setLockedUntil(LocalDateTime.now().plusMinutes(minutes));
+        }
+
+        userRepository.saveAndFlush(user);
     }
 }

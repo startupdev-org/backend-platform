@@ -60,6 +60,16 @@ public class User {
     @Column(nullable = false, columnDefinition = "boolean default true")
     private boolean isEnabled = true;
 
+    // Consecutive failed logins since the last success. Reset to 0 on a successful login.
+    // @Builder.Default for the same reason as isEnabled above.
+    @Builder.Default
+    @Column(nullable = false, columnDefinition = "integer default 0")
+    private int failedLoginAttempts = 0;
+
+    // When set and in the future, login is refused with 429 regardless of the password.
+    // Cleared on a successful login.
+    private LocalDateTime lockedUntil;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

@@ -5,6 +5,7 @@ import com.platform.dto.location.LocationResponseDTO;
 import com.platform.entity.User;
 import com.platform.service.LocationService;
 import com.platform.service.UserService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,7 +27,7 @@ public class LocationController {
     @PostMapping
     public ResponseEntity<LocationResponseDTO> createLocation(
             @PathVariable UUID businessId,
-            @RequestBody LocationRequestDTO requestDTO,
+            @Valid @RequestBody LocationRequestDTO requestDTO,
             Authentication authentication) {
         User currentUser = userService.getUserByUsername(authentication.getName());
         LocationResponseDTO responseDTO = locationService.createLocation(businessId, requestDTO, currentUser);
@@ -54,7 +55,7 @@ public class LocationController {
     public ResponseEntity<LocationResponseDTO> updateLocation(
             @PathVariable UUID businessId,
             @PathVariable UUID locationId,
-            @RequestBody LocationRequestDTO requestDTO,
+            @Valid @RequestBody LocationRequestDTO requestDTO,
             Authentication authentication) {
         User currentUser = userService.getUserByUsername(authentication.getName());
         LocationResponseDTO updatedLocation = locationService.updateLocation(businessId, locationId, requestDTO, currentUser);

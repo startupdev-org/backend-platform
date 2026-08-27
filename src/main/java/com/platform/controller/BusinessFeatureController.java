@@ -5,6 +5,7 @@ import com.platform.entity.BusinessFeature;
 import com.platform.repository.BusinessFeatureRepository;
 import com.platform.repository.BusinessRepository;
 import com.platform.service.FeatureService;
+import jakarta.validation.Valid;
 import com.platform.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -35,7 +36,7 @@ public class BusinessFeatureController {
     @PostMapping
     public ResponseEntity<BusinessFeatureDTO> addFeature(
             @PathVariable UUID businessId,
-            @RequestBody BusinessFeatureDTO request) {
+            @Valid @RequestBody BusinessFeatureDTO request) {
         return ResponseEntity.ok(featureService.addFeature(request));
     }
 

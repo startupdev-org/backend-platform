@@ -1,5 +1,6 @@
 package com.platform.dto.business;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,11 +13,17 @@ import java.time.LocalTime;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class    CreateWorkingHoursRequest {
+public class CreateWorkingHoursRequest {
 
+    @NotNull(message = "Day of week is required")
     private DayOfWeek dayOfWeek;
-    private LocalTime openTime;
-    private LocalTime closeTime;
 
-    // getters & setters
+    // All three are @NotNull because the service dereferences them without a null
+    // check: a null openTime used to NPE inside validateTimeRange and surface as a
+    // 500, presenting a client input error as a server fault.
+    @NotNull(message = "Open time is required")
+    private LocalTime openTime;
+
+    @NotNull(message = "Close time is required")
+    private LocalTime closeTime;
 }

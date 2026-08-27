@@ -43,7 +43,7 @@ public class R2StorageProvider implements StorageProvider {
             PutObjectRequest putRequest = PutObjectRequest.builder()
                     .bucket(bucket())
                     .key(key)
-//                    .contentType(contentType)
+                    .contentType(contentType)
                     .build();
 
             PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()

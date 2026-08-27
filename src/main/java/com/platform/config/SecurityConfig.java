@@ -39,7 +39,10 @@ public class SecurityConfig {
     // ── Public endpoints ──────────────────────────────────────────────────────
     // Specific paths, not "/api/auth/**": a new POST under /api/auth is then
     // authenticated by default and made public only by an explicit edit here.
-    private static final String[] PUBLIC_POST_PATTERNS   = { "/api/auth/login", "/api/auth/register" };
+    // /refresh and /logout are public because the refresh token *is* the credential:
+    // the caller's access token has usually already expired by the time they get here.
+    private static final String[] PUBLIC_POST_PATTERNS   = {
+            "/api/auth/login", "/api/auth/register", "/api/auth/refresh", "/api/auth/logout" };
     private static final String[] PUBLIC_GET_PATTERNS    = {
             "/api/health/**",
             "/swagger-ui/**",

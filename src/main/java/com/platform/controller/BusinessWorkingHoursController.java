@@ -5,6 +5,7 @@ import com.platform.dto.business.BusinessWorkingHoursDTO;
 import com.platform.entity.User;
 import com.platform.service.BusinessWorkingHoursService;
 import com.platform.service.UserService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -24,7 +25,7 @@ public class BusinessWorkingHoursController {
     @PostMapping
     public ResponseEntity<BusinessWorkingHoursDTO> create(
             @PathVariable UUID businessId,
-            @RequestBody CreateWorkingHoursRequest request,
+            @Valid @RequestBody CreateWorkingHoursRequest request,
             Authentication authentication) {
 
         User currentUser = userService.getUserByUsername(authentication.getName());
@@ -44,7 +45,7 @@ public class BusinessWorkingHoursController {
     public ResponseEntity<BusinessWorkingHoursDTO> update(
             @PathVariable UUID businessId,
             @PathVariable Long id,
-            @RequestBody CreateWorkingHoursRequest request,
+            @Valid @RequestBody CreateWorkingHoursRequest request,
             Authentication authentication) {
 
         User currentUser = userService.getUserByUsername(authentication.getName());

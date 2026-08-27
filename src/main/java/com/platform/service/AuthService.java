@@ -4,10 +4,12 @@ import com.platform.config.RateLimitProperties;
 import com.platform.dto.auth.LoginRequest;
 import com.platform.dto.auth.LoginResponse;
 import com.platform.dto.auth.RegisterRequest;
+import com.platform.entity.RefreshToken;
 import com.platform.entity.User;
 import com.platform.exception.AccountLockedException;
 import com.platform.exception.EmailAlreadyRegisteredException;
 import com.platform.exception.InvalidCredentialsException;
+import com.platform.exception.UserNotEnabledException;
 import com.platform.repository.UserRepository;
 import com.platform.utils.JwtUtils;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
     private final RateLimitProperties rateLimitProperties;
+    private final RefreshTokenService refreshTokenService;
 
     @Transactional
     public LoginResponse register(RegisterRequest request) {
@@ -55,7 +58,7 @@ public class AuthService {
             throw new EmailAlreadyRegisteredException("Email already registered");
         }
 
-        return LoginResponse.fromUser(user, jwtUtils.generateToken(user));
+        return issueSession(user);
     }
 
     /**
@@ -93,7 +96,44 @@ public class AuthService {
             userRepository.saveAndFlush(user);
         }
 
-        return LoginResponse.fromUser(user, jwtUtils.generateToken(user));
+        return issueSession(user);
+    }
+
+    /**
+     * Exchanges a refresh token for a new access token, rotating the refresh token in the
+     * process. The old one is spent here, so a replay of it revokes every session for the
+     * user - see {@link RefreshTokenService#verifyAndConsume}.
+     */
+    @Transactional
+    public LoginResponse refresh(String rawRefreshToken) {
+        RefreshToken spent = refreshTokenService.verifyAndConsume(rawRefreshToken);
+        User user = spent.getUser();
+
+        // The one place a disabled or demoted account is re-checked against the database.
+        // The access token carries role and identity as claims for its whole lifetime, so
+        // this is where a change actually takes effect - within one access-token lifetime.
+        if (!user.isEnabled()) {
+            refreshTokenService.revokeAllForUser(user);
+            throw new UserNotEnabledException("User is not enabled");
+        }
+
+        LoginResponse response = issueSession(user);
+        refreshTokenService.linkSuccessor(spent, response.getRefreshToken());
+        return response;
+    }
+
+    /** Idempotent: an unknown or already-spent token is not an error. */
+    @Transactional
+    public void logout(String rawRefreshToken) {
+        refreshTokenService.revoke(rawRefreshToken);
+    }
+
+    private LoginResponse issueSession(User user) {
+        return LoginResponse.fromUser(
+                user,
+                jwtUtils.generateToken(user),
+                refreshTokenService.issue(user).rawToken(),
+                jwtUtils.getExpirationInSeconds());
     }
 
     private void registerFailedAttempt(User user, RateLimitProperties.Lockout lockout) {

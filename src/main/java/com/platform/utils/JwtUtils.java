@@ -30,7 +30,10 @@ public class JwtUtils {
     @Value("${jwt.secret}")
     private String jwtSecret;
 
-    @Value("${jwt.expiration:86400000}")
+    // Short by design. The token cannot be revoked, so its lifetime *is* the revocation
+    // window; anything longer is bounded only by hope. Continuity comes from the refresh
+    // token instead - see RefreshTokenService.
+    @Value("${jwt.expiration:900000}")
     private long jwtExpirationInMs;
 
     // Built once. This used to be rebuilt on every call, four times per authenticated request.
@@ -64,6 +67,11 @@ public class JwtUtils {
                 .expiration(new Date(now.getTime() + jwtExpirationInMs))
                 .signWith(signingKey)  // algorithm inferred from key type
                 .compact();
+    }
+
+    /** Access-token lifetime in seconds, for the {@code expiresIn} field of a login response. */
+    public long getExpirationInSeconds() {
+        return jwtExpirationInMs / 1000;
     }
 
     // ── Token reading ─────────────────────────────────────────────────────────

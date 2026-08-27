@@ -1,5 +1,6 @@
 package com.platform.exception;
 
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
@@ -91,6 +92,15 @@ public class GlobalExceptionHandler {
     // for any other authentication failure raised during dispatch. The token is unusable,
     // so this is a 401 - and the message stays generic so it is not a probe oracle.
     // UsernameNotFoundException is an AuthenticationException, so this covers both.
+    // Unknown, expired and already-spent all return the same body: telling them apart
+    // would help whoever is holding a stolen token work out what they have.
+    @ExceptionHandler(InvalidRefreshTokenException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidRefreshToken(
+            InvalidRefreshTokenException ex, WebRequest request) {
+        log.warn("Refresh token rejected on {}", path(request));
+        return build(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token", request);
+    }
+
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ErrorResponse> handleAuthenticationFailure(
             AuthenticationException ex, WebRequest request) {
@@ -156,6 +166,31 @@ public class GlobalExceptionHandler {
         ex.getBindingResult().getFieldErrors().forEach(error ->
                 errors.put(error.getField(), error.getDefaultMessage())
         );
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Validation Error")
+                .message("Invalid request parameters")
+                .validationErrors(errors)
+                .path(path(request))
+                .build();
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    // The @Validated counterpart of the handler above: constraints on request
+    // params and path variables raise ConstraintViolationException instead, which
+    // would otherwise fall through to the catch-all and be reported as a 500.
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponse> handleConstraintViolation(
+            ConstraintViolationException ex, WebRequest request) {
+        Map<String, String> errors = new HashMap<>();
+        ex.getConstraintViolations().forEach(violation -> {
+            String path = violation.getPropertyPath().toString();
+            // "addBusinessReply.reply" -> "reply"
+            String field = path.contains(".") ? path.substring(path.lastIndexOf('.') + 1) : path;
+            errors.put(field, violation.getMessage());
+        });
 
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())

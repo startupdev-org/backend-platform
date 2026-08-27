@@ -42,7 +42,8 @@ import java.util.Set;
 @Slf4j
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    private static final Set<String> PROTECTED_PATHS = Set.of("/api/auth/login", "/api/auth/register");
+    private static final Set<String> PROTECTED_PATHS =
+            Set.of("/api/auth/login", "/api/auth/register", "/api/auth/refresh");
 
     private final RateLimitProperties properties;
     private final ObjectMapper objectMapper;

@@ -39,7 +39,12 @@ spring:
     show-sql: false
 jwt:
   secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION:86400000}
+  # Access token: minutes, not a day. It cannot be revoked, so this value is the
+  # revocation window. Both Render services must drop JWT_EXPIRATION (or set it to
+  # 900000) - an env var set to the old 86400000 would silently keep the 24h window.
+  expiration: ${JWT_EXPIRATION:900000}
+  # Refresh token: 30 days. Revocable, single-use, stored hashed.
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:2592000000}
 
 server:
   # Render injects PORT; SERVER_PORT is the local override.

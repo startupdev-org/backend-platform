@@ -107,14 +107,4 @@ public class Business {
     public boolean isNotOwner(User userToCheck) {
         return !owner.getId().equals(userToCheck.getId());
     }
-
-    public static boolean hasFeatureById(Business business, Long functionId) {
-        if (business == null || business.getFeatures() == null) {
-            return false;
-        }
-
-        return business.getFeatures()
-                .stream()
-                .anyMatch(feature -> feature.getFeatureId().equals(functionId));
-    }
 }

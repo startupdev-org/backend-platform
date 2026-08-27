@@ -4,7 +4,7 @@ import com.platform.dto.business.BusinessFeatureDTO;
 import com.platform.entity.Business;
 import com.platform.entity.BusinessFeature;
 import com.platform.entity.User;
-import com.platform.exception.BusinessException;
+import com.platform.exception.BadRequestException;
 import com.platform.exception.BusinessFeatureAlreadyExistsException;
 import com.platform.exception.BusinessOwnershipException;
 import com.platform.exception.ResourceNotFoundException;
@@ -13,6 +13,7 @@ import com.platform.repository.BusinessFeatureRepository;
 import com.platform.repository.BusinessRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -37,19 +38,31 @@ public class FeatureService {
                         .build()).collect(Collectors.toSet());
     }
 
-    public BusinessFeatureDTO addFeature(BusinessFeatureDTO request) {
+    /**
+     * Adds a feature to {@code businessId}.
+     *
+     * <p>The path variable is the authority for which business is written to. The
+     * request body used to decide that instead, which let the URL and the effect
+     * disagree and made the SecurityConfig matcher for this path meaningless.
+     */
+    @Transactional
+    public BusinessFeatureDTO addFeature(UUID businessId, BusinessFeatureDTO request) {
         User user = userService.getUser();
 
         if (!user.isEnabled())
             throw new UserNotEnabledException("User is not enabled");
 
-        Business business = getBusinessById(request.getBusinessId());
+        if (request.getBusinessId() != null && !request.getBusinessId().equals(businessId)) {
+            throw new BadRequestException("businessId in the body does not match the one in the path");
+        }
+
+        Business business = getBusinessById(businessId);
 
         if (business.isNotOwner(user)) {
             throw new BusinessOwnershipException("Cannot add a new feature to a business you do not own");
         }
 
-        if(featureRepository.existsByBusinessIdAndName(request.getBusinessId(), request.getName())) {
+        if(featureRepository.existsByBusinessIdAndName(businessId, request.getName())) {
             throw new BusinessFeatureAlreadyExistsException(
                     "Feature already exists for this business"
             );
@@ -70,14 +83,30 @@ public class FeatureService {
 
     }
 
+    /**
+     * Deletes a feature from {@code businessId}.
+     *
+     * <p>Ownership is checked first, mirroring {@link #addFeature}: this method used
+     * to verify only that the feature belonged to the business named in the path, so
+     * any BUSINESS_ADMIN could delete any other business's features. A feature that
+     * belongs to a different business is reported as not found, not forbidden.
+     */
+    @Transactional
     public void removeFeature(UUID businessId, Long featureId) {
+        User user = userService.getUser();
+
         Business business = getBusinessById(businessId);
 
-        if (!Business.hasFeatureById(business, featureId)) {
-            throw new BusinessException("Cannot remove a feature from another business");
+        if (business.isNotOwner(user)) {
+            throw new BusinessOwnershipException("Cannot remove a feature from a business you do not own");
         }
 
         BusinessFeature feature = getFeatureById(featureId);
+
+        if (!business.getId().equals(feature.getBusiness().getId())) {
+            throw new ResourceNotFoundException("Feature not found");
+        }
+
         featureRepository.delete(feature);
     }
 

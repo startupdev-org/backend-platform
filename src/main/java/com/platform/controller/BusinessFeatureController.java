@@ -1,9 +1,6 @@
 package com.platform.controller;
 
 import com.platform.dto.business.BusinessFeatureDTO;
-import com.platform.entity.BusinessFeature;
-import com.platform.repository.BusinessFeatureRepository;
-import com.platform.repository.BusinessRepository;
 import com.platform.service.FeatureService;
 import jakarta.validation.Valid;
 import com.platform.service.UserService;
@@ -18,12 +15,6 @@ import java.util.*;
 @RequiredArgsConstructor
 public class BusinessFeatureController {
 
-    private final BusinessRepository businessRepository;
-    private final BusinessFeatureRepository featureRepository;
-
-
-    private final UserService userService;
-
     private final FeatureService featureService;
 
     // GET all features for a business
@@ -37,7 +28,7 @@ public class BusinessFeatureController {
     public ResponseEntity<BusinessFeatureDTO> addFeature(
             @PathVariable UUID businessId,
             @Valid @RequestBody BusinessFeatureDTO request) {
-        return ResponseEntity.ok(featureService.addFeature(request));
+        return ResponseEntity.ok(featureService.addFeature(businessId, request));
     }
 
     // DELETE - remove a feature

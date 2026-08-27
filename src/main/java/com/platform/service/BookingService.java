@@ -3,13 +3,16 @@ package com.platform.service;
 import com.platform.dto.booking.BookingRequestDTO;
 import com.platform.dto.booking.BookingResponseDTO;
 import com.platform.entity.Booking;
+import com.platform.entity.Business;
 import com.platform.entity.Employee;
 import com.platform.entity.EmployeeLocationServicePrice;
 import com.platform.entity.Location;
 import com.platform.entity.ProvidedService;
+import com.platform.entity.User;
 import com.platform.exception.BusinessException;
 import com.platform.exception.ResourceNotFoundException;
 import com.platform.repository.BookingRepository;
+import com.platform.repository.BusinessRepository;
 import com.platform.repository.EmployeeLocationServicePriceRepository;
 import com.platform.repository.EmployeeRepository;
 import com.platform.repository.LocationRepository;
@@ -28,10 +31,15 @@ import java.util.stream.Collectors;
 public class BookingService {
 
     private final BookingRepository bookingRepository;
+    private final BusinessRepository businessRepository;
     private final EmployeeRepository employeeRepository;
     private final ServiceRepository serviceRepository;
     private final LocationRepository locationRepository;
     private final EmployeeLocationServicePriceRepository priceRepository;
+
+    private static final String BOOKING_NOT_FOUND = "Booking not found";
+    private static final String EMPLOYEE_NOT_FOUND = "Employee not found";
+    private static final String BUSINESS_NOT_FOUND = "Business not found";
 
     @Transactional
     public BookingResponseDTO createBooking(BookingRequestDTO dto) {
@@ -86,30 +94,57 @@ public class BookingService {
                         "No default location found and no location specified in request"));
     }
 
-    public BookingResponseDTO getBooking(UUID id) {
+    public BookingResponseDTO getBooking(UUID id, User currentUser) {
         Booking booking = bookingRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(BOOKING_NOT_FOUND));
+        assertCanAccessBooking(booking, currentUser);
         return toDTO(booking);
     }
 
-    public List<BookingResponseDTO> listBookings(UUID employeeId, Booking.BookingStatus status) {
+    /**
+     * Bookings visible to {@code currentUser}. A BUSINESS_ADMIN only ever sees
+     * bookings of the businesses they own; PLATFORM_ADMIN sees all. The no-filter
+     * path used to fall through to an unscoped findAll() that returned every
+     * customer's PII platform-wide. See BP-29.
+     */
+    public List<BookingResponseDTO> listBookings(UUID employeeId, Booking.BookingStatus status, User currentUser) {
+        boolean platformAdmin = isPlatformAdmin(currentUser);
+
         List<Booking> bookings;
-        if (employeeId != null && status != null) {
-            bookings = bookingRepository.findByEmployeeId(employeeId);
-            bookings = bookings.stream()
-                    .filter(b -> b.getStatus().equals(status))
-                    .collect(Collectors.toList());
-        } else if (employeeId != null) {
-            bookings = bookingRepository.findByEmployeeId(employeeId);
-        } else if (status != null) {
-            bookings = bookingRepository.findByStatus(status);
+        if (employeeId != null) {
+            Employee employee = employeeRepository.findById(employeeId)
+                    .orElseThrow(() -> new ResourceNotFoundException(EMPLOYEE_NOT_FOUND));
+            if (!platformAdmin && employee.getBusiness().isNotOwner(currentUser)) {
+                // Do not confirm the employee exists to a caller from another tenant.
+                throw new ResourceNotFoundException(EMPLOYEE_NOT_FOUND);
+            }
+            bookings = (status != null)
+                    ? bookingRepository.findByEmployeeIdAndStatusForListing(employeeId, status)
+                    : bookingRepository.findByEmployeeIdForListing(employeeId);
+        } else if (platformAdmin) {
+            bookings = (status != null)
+                    ? bookingRepository.findByStatusForListing(status)
+                    : bookingRepository.findAllForListing();
         } else {
-            bookings = bookingRepository.findAll();
+            List<UUID> ownedBusinessIds = businessRepository.findByOwnerId(currentUser.getId())
+                    .stream().map(Business::getId).toList();
+            if (ownedBusinessIds.isEmpty()) {
+                return List.of();
+            }
+            bookings = (status != null)
+                    ? bookingRepository.findByBusinessIdInAndStatusForListing(ownedBusinessIds, status)
+                    : bookingRepository.findByBusinessIdInForListing(ownedBusinessIds);
         }
         return bookings.stream().map(this::toDTO).collect(Collectors.toList());
     }
 
-    public List<BookingResponseDTO> getEmployeeBookings(UUID employeeId, LocalDateTime startDate, LocalDateTime endDate) {
+    public List<BookingResponseDTO> getEmployeeBookings(
+            UUID employeeId, LocalDateTime startDate, LocalDateTime endDate, User currentUser) {
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException(EMPLOYEE_NOT_FOUND));
+        if (!isPlatformAdmin(currentUser) && employee.getBusiness().isNotOwner(currentUser)) {
+            throw new ResourceNotFoundException(EMPLOYEE_NOT_FOUND);
+        }
         return bookingRepository.findByEmployeeAndDateRange(employeeId, startDate, endDate)
                 .stream()
                 .map(this::toDTO)
@@ -117,9 +152,10 @@ public class BookingService {
     }
 
     @Transactional
-    public BookingResponseDTO updateBookingStatus(UUID id, Booking.BookingStatus newStatus) {
+    public BookingResponseDTO updateBookingStatus(UUID id, Booking.BookingStatus newStatus, User currentUser) {
         Booking booking = bookingRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(BOOKING_NOT_FOUND));
+        assertCanAccessBooking(booking, currentUser);
 
         booking.setStatus(newStatus);
         booking = bookingRepository.save(booking);
@@ -127,9 +163,10 @@ public class BookingService {
     }
 
     @Transactional
-    public void cancelBooking(UUID id) {
+    public void cancelBooking(UUID id, User currentUser) {
         Booking booking = bookingRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(BOOKING_NOT_FOUND));
+        assertCanAccessBooking(booking, currentUser);
 
         if (booking.getStatus().equals(Booking.BookingStatus.COMPLETED)) {
             throw new BusinessException("Cannot cancel a completed booking");
@@ -139,11 +176,39 @@ public class BookingService {
         bookingRepository.save(booking);
     }
 
-    public List<BookingResponseDTO> getBusinessBookings(UUID businessId, Booking.BookingStatus status) {
+    public List<BookingResponseDTO> getBusinessBookings(
+            UUID businessId, Booking.BookingStatus status, User currentUser) {
+        Business business = businessRepository.findById(businessId)
+                .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_NOT_FOUND));
+        if (!isPlatformAdmin(currentUser) && business.isNotOwner(currentUser)) {
+            throw new ResourceNotFoundException(BUSINESS_NOT_FOUND);
+        }
         return bookingRepository.findByBusinessAndStatus(businessId, status)
                 .stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
+    }
+
+    // ── Authorization ─────────────────────────────────────────────────────────
+
+    private boolean isPlatformAdmin(User user) {
+        return user.getRole() == User.UserRole.PLATFORM_ADMIN;
+    }
+
+    /**
+     * A booking belongs to the business of the employee it was booked with. A
+     * caller who is neither that business's owner nor a PLATFORM_ADMIN is told the
+     * booking does not exist rather than that it is forbidden - a 403 would confirm
+     * a probed id belongs to a real booking of another tenant. See BP-29.
+     */
+    private void assertCanAccessBooking(Booking booking, User currentUser) {
+        if (isPlatformAdmin(currentUser)) {
+            return;
+        }
+        Business business = booking.getEmployee().getBusiness();
+        if (business == null || business.isNotOwner(currentUser)) {
+            throw new ResourceNotFoundException(BOOKING_NOT_FOUND);
+        }
     }
 
     private BookingResponseDTO toDTO(Booking booking) {

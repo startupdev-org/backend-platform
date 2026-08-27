@@ -21,9 +21,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -76,6 +79,19 @@ public class ProvidedServicesService {
                 .stream()
                 .map(this::toDTO)
                 .toList();
+    }
+
+    /**
+     * Services for many businesses in one query, grouped by business id. The list
+     * endpoints call this once instead of {@link #getBusinessServices(UUID)} per
+     * business. See BP-53.
+     */
+    public Map<UUID, List<ServiceResponseDTO>> getServicesByBusinessIds(Collection<UUID> businessIds) {
+        if (businessIds.isEmpty()) return Map.of();
+        return serviceRepository.findByBusinessIdIn(businessIds).stream()
+                .collect(Collectors.groupingBy(
+                        s -> s.getBusiness().getId(),
+                        Collectors.mapping(this::toDTO, Collectors.toList())));
     }
 
     public List<ServiceResponseDTO> getActiveServices(UUID businessId) {

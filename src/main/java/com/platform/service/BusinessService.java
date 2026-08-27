@@ -4,6 +4,7 @@ import com.platform.dto.business.BusinessFeatureDTO;
 import com.platform.dto.business.BusinessMapper;
 import com.platform.dto.business.BusinessRequestDTO;
 import com.platform.dto.business.BusinessResponseDTO;
+import com.platform.dto.business.BusinessWorkingHoursDTO;
 import com.platform.dto.employee.EmployeeResponseDTO;
 import com.platform.dto.location.LocationResponseDTO;
 import com.platform.dto.service.ServiceResponseDTO;
@@ -13,12 +14,15 @@ import com.platform.entity.User;
 import com.platform.exception.BadRequestException;
 import com.platform.exception.BusinessException;
 import com.platform.exception.ResourceNotFoundException;
+import com.platform.entity.BusinessWorkingHours;
 import com.platform.repository.BusinessRepository;
+import com.platform.repository.BusinessWorkingHoursRepository;
 import com.platform.repository.spec.BusinessSpecifications;
 import com.platform.storage.ImageUrlResolver;
 import com.platform.utils.SlugGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -28,6 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +44,7 @@ public class BusinessService {
     private final EmployeeService employeeService;
     private final FeatureService featureService;
     private final LocationService locationService;
+    private final BusinessWorkingHoursRepository workingHoursRepository;
     private final ImageUrlResolver imageUrls;
 
     private static final String BUSINESS_EXCEPTION = "Business not found";
@@ -113,7 +119,8 @@ public class BusinessService {
             spec = spec.and(BusinessSpecifications.hasCategory(parseCategory(businessCategoryType)));
         }
 
-        return businessRepository.findAll(spec, pageable).map(this::toDTO);
+        Page<Business> page = businessRepository.findAll(spec, pageable);
+        return new PageImpl<>(toDTOList(page.getContent()), pageable, page.getTotalElements());
     }
 
     /** An unknown category is rejected rather than quietly matching nothing. */
@@ -162,10 +169,7 @@ public class BusinessService {
     }
 
     public List<BusinessResponseDTO> getUserBusinesses(UUID userId) {
-        return businessRepository.findByOwnerId(userId)
-                .stream()
-                .map(this::toDTO)
-                .toList();
+        return toDTOList(businessRepository.findByOwnerId(userId));
     }
 
     private BusinessResponseDTO toDTO(Business business) {
@@ -176,6 +180,51 @@ public class BusinessService {
         List<LocationResponseDTO> locationList = locationService.getLocationsForBusiness(business.getId());
 
         return BusinessMapper.toDTO(business, businessServices, employeeList, featureList, locationList, owner, imageUrls);
+    }
+
+    /**
+     * Maps a list of businesses, batch-loading every child collection and every
+     * owner by business / owner id instead of firing the ~7 queries per business
+     * that {@link #toDTO(Business)} does. This is the {@code UserService.whoami}
+     * pattern applied to the list endpoints. See BP-53.
+     */
+    private List<BusinessResponseDTO> toDTOList(List<Business> businesses) {
+        if (businesses.isEmpty()) return List.of();
+
+        List<UUID> businessIds = businesses.stream().map(Business::getId).toList();
+
+        Map<UUID, List<ServiceResponseDTO>> servicesByBusiness =
+                providedServicesService.getServicesByBusinessIds(businessIds);
+        Map<UUID, List<EmployeeResponseDTO>> employeesByBusiness =
+                employeeService.getEmployeesByBusinessIds(businessIds);
+        Map<UUID, Set<BusinessFeatureDTO>> featuresByBusiness =
+                featureService.getFeaturesByBusinessIds(businessIds);
+        Map<UUID, List<LocationResponseDTO>> locationsByBusiness =
+                locationService.getLocationsByBusinessIds(businessIds);
+        Map<UUID, List<BusinessWorkingHoursDTO>> workingHoursByBusiness =
+                workingHoursRepository.findByBusinessIdIn(businessIds).stream()
+                        .collect(Collectors.groupingBy(
+                                wh -> wh.getBusiness().getId(),
+                                Collectors.mapping(
+                                        (BusinessWorkingHours wh) -> BusinessMapper.toDTO(wh),
+                                        Collectors.toList())));
+
+        Set<UUID> ownerIds = businesses.stream()
+                .map(b -> b.getOwner().getId())
+                .collect(Collectors.toSet());
+        Map<UUID, User> ownersById = userService.getUsersByIds(ownerIds);
+
+        return businesses.stream()
+                .map(b -> BusinessMapper.toDTO(
+                        b,
+                        servicesByBusiness.getOrDefault(b.getId(), List.of()),
+                        employeesByBusiness.getOrDefault(b.getId(), List.of()),
+                        featuresByBusiness.getOrDefault(b.getId(), Set.of()),
+                        locationsByBusiness.getOrDefault(b.getId(), List.of()),
+                        workingHoursByBusiness.getOrDefault(b.getId(), List.of()),
+                        ownersById.get(b.getOwner().getId()),
+                        imageUrls))
+                .toList();
     }
 
     private User getUser() {
@@ -189,7 +238,7 @@ public class BusinessService {
     }
 
     public Page<BusinessResponseDTO> listBusinessesByQuery(String query, Pageable pageable) {
-        return businessRepository.findByNameContainingIgnoreCase(query, pageable)
-                .map(this::toDTO);
+        Page<Business> page = businessRepository.findByNameContainingIgnoreCase(query, pageable);
+        return new PageImpl<>(toDTOList(page.getContent()), pageable, page.getTotalElements());
     }
 }

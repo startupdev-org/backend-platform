@@ -12,7 +12,9 @@ import com.platform.repository.LocationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -54,6 +56,19 @@ public class LocationService {
                 .stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Locations for many businesses in one query, grouped by business id. The list
+     * endpoints call this once instead of {@link #getLocationsForBusiness(UUID)}
+     * per business. See BP-53.
+     */
+    public Map<UUID, List<LocationResponseDTO>> getLocationsByBusinessIds(Collection<UUID> businessIds) {
+        if (businessIds.isEmpty()) return Map.of();
+        return locationRepository.findByBusinessIdIn(businessIds).stream()
+                .collect(Collectors.groupingBy(
+                        l -> l.getBusiness().getId(),
+                        Collectors.mapping(this::mapToDTO, Collectors.toList())));
     }
 
     // Get location by ID, scoped to a business

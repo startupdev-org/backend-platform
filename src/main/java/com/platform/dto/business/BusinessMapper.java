@@ -82,6 +82,26 @@ public class BusinessMapper {
             User owner,
             ImageUrlResolver imageUrls
     ) {
+        // Single-business callers read working hours off the (already loaded) entity.
+        return toDTO(business, services, employeeList, features, locationList,
+                toWorkingHoursDTOList(business.getWorkingHours()), owner, imageUrls);
+    }
+
+    /**
+     * Every child collection is passed in explicitly, so this never touches a lazy
+     * association. The list endpoints use it after batch-loading the children by
+     * business id, which is what removes the per-business query fan-out. See BP-53.
+     */
+    public static BusinessResponseDTO toDTO(
+            Business business,
+            List<ServiceResponseDTO> services,
+            List<EmployeeResponseDTO> employeeList,
+            Set<BusinessFeatureDTO> features,
+            List<LocationResponseDTO> locationList,
+            List<BusinessWorkingHoursDTO> workingHours,
+            User owner,
+            ImageUrlResolver imageUrls
+    ) {
         return BusinessResponseDTO.builder()
                 .id(business.getId())
                 .name(business.getName())
@@ -97,7 +117,7 @@ public class BusinessMapper {
                 .createdAt(business.getCreatedAt())
                 .updatedAt(business.getUpdatedAt())
                 .owner(owner != null ? toDTO(owner) : null)
-                .businessWorkingHours(toWorkingHoursDTOList(business.getWorkingHours()))
+                .businessWorkingHours(workingHours)
                 .providedServices(services)
                 .employeeList(employeeList)
                 .businessFeatures(features)

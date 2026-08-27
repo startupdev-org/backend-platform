@@ -14,4 +14,6 @@ public interface BusinessWorkingHoursRepository extends JpaRepository<BusinessWo
     );
 
     List<BusinessWorkingHours> findByBusinessId(UUID businessId);
+
+    List<BusinessWorkingHours> findByBusinessIdIn(Collection<UUID> businessIds);
 }

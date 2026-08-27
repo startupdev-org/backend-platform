@@ -26,9 +26,10 @@ import java.time.LocalDateTime;
 import java.util.Set;
 
 /**
- * Per-IP throttle on the public authentication endpoints. Without it, {@code /api/auth/login}
- * is an unbounded credential-stuffing and BCrypt CPU-exhaustion target, and
- * {@code /api/auth/register} an unbounded account/email spam target.
+ * Per-IP throttle on the public write endpoints. Without it, {@code /api/auth/login}
+ * is an unbounded credential-stuffing and BCrypt CPU-exhaustion target,
+ * {@code /api/auth/register} an unbounded account/email spam target, and
+ * {@code /api/booking} an unbounded booking-spam target now that it is anonymous.
  *
  * <p>Each client IP gets a bucket4j token bucket, kept in a size-bounded Caffeine cache that
  * evicts idle IPs. In-memory, so per-instance - sized for a single Render instance.
@@ -42,14 +43,17 @@ import java.util.Set;
 @Slf4j
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    // Every path here either checks a credential or hands one out. /change-password is
-    // included even though it is authenticated: it compares the current password and the
-    // per-account lockout does not cover it, so the per-IP throttle is the only bound on
-    // guessing it with a stolen access token.
+    // Public POST endpoints that are an abuse target without a per-IP bound. Most
+    // either check a credential or hand one out; /change-password is included even
+    // though it is authenticated, because it compares the current password and the
+    // per-account lockout does not cover it. /api/booking is the anonymous booking
+    // create path (BP-46) - unbounded, it is a booking-spam target the same way
+    // /api/auth/register is an account-spam target.
     private static final Set<String> PROTECTED_PATHS =
             Set.of("/api/auth/login", "/api/auth/register", "/api/auth/refresh",
                     "/api/auth/forgot-password", "/api/auth/reset-password",
-                    "/api/auth/change-password");
+                    "/api/auth/change-password",
+                    "/api/booking");
 
     private final RateLimitProperties properties;
     private final ObjectMapper objectMapper;

@@ -9,6 +9,9 @@ import com.platform.enums.ServiceDeliveryType;
 import com.platform.repository.BusinessRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Root;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
@@ -16,11 +19,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.platform.dto.business.BusinessRequestDTO;
 import com.platform.dto.business.BusinessResponseDTO;
+import com.platform.exception.BadRequestException;
 import com.platform.exception.BusinessException;
 import com.platform.exception.ResourceNotFoundException;
 import com.platform.storage.ImageUrlResolver;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
@@ -386,13 +391,15 @@ class BusinessServiceTest {
     // listBusinesses
     // ----------------------------
 
+    // The filters used to be an if / else-if chain: city + category dropped the
+    // category, and minRating alone was ignored outright.
     @Test
-    void listBusinesses_withCity() {
+    void listBusinesses_cityAndCategory_bothReachTheQuery() {
 
         User owner = createBusinessAdmin();
         Business business = createBusiness(owner);
 
-        when(businessRepository.findByCity(eq("Chisinau"), any(Pageable.class)))
+        when(businessRepository.findAll(ArgumentMatchers.<Specification<Business>>any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(business)));
 
         when(providedServicesService.getBusinessServices(business.getId()))
@@ -416,6 +423,77 @@ class BusinessServiceTest {
                 );
 
         assertEquals(1, page.getContent().size());
+
+        CriteriaBuilder cb = evaluateCapturedSpecification();
+        verify(cb).like(any(), eq("%chisinau%"));
+        verify(cb).equal(any(), eq(BusinessCategoryType.BARBERSHOP));
+    }
+
+    @Test
+    void listBusinesses_minRatingAlone_reachesTheQuery() {
+
+        when(businessRepository.findAll(ArgumentMatchers.<Specification<Business>>any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        businessService.listBusinesses(null, 4.0, null, PageRequest.of(0, 10));
+
+        CriteriaBuilder cb = evaluateCapturedSpecification();
+        verify(cb).greaterThanOrEqualTo(any(), eq(4.0));
+    }
+
+    @Test
+    void listBusinesses_allThreeFilters_allReachTheQuery() {
+
+        when(businessRepository.findAll(ArgumentMatchers.<Specification<Business>>any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        businessService.listBusinesses(
+                "Chisinau", 4.0, BusinessCategoryType.SPA.name(), PageRequest.of(0, 10));
+
+        CriteriaBuilder cb = evaluateCapturedSpecification();
+        verify(cb).like(any(), eq("%chisinau%"));
+        verify(cb).greaterThanOrEqualTo(any(), eq(4.0));
+        verify(cb).equal(any(), eq(BusinessCategoryType.SPA));
+    }
+
+    @Test
+    void listBusinesses_noFilters_appliesNoPredicate() {
+
+        when(businessRepository.findAll(ArgumentMatchers.<Specification<Business>>any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        businessService.listBusinesses(null, null, null, PageRequest.of(0, 10));
+
+        CriteriaBuilder cb = evaluateCapturedSpecification();
+        verifyNoInteractions(cb);
+    }
+
+    // Silently matching nothing would look like "no results" to the caller.
+    @Test
+    void listBusinesses_unknownCategory_rejected() {
+
+        assertThrows(BadRequestException.class,
+                () -> businessService.listBusinesses(null, null, "NOT_A_CATEGORY", PageRequest.of(0, 10)));
+
+        verify(businessRepository, never())
+                .findAll(ArgumentMatchers.<Specification<Business>>any(), any(Pageable.class));
+    }
+
+    /**
+     * Pulls the Specification the service handed the repository and runs it against
+     * mocks, so the returned CriteriaBuilder records which predicates were built.
+     */
+    @SuppressWarnings("unchecked")
+    private CriteriaBuilder evaluateCapturedSpecification() {
+        ArgumentCaptor<Specification<Business>> captor = ArgumentCaptor.forClass(Specification.class);
+        verify(businessRepository).findAll(captor.capture(), any(Pageable.class));
+
+        Root<Business> root = mock(Root.class, RETURNS_DEEP_STUBS);
+        CriteriaQuery<?> query = mock(CriteriaQuery.class);
+        CriteriaBuilder cb = mock(CriteriaBuilder.class, RETURNS_DEEP_STUBS);
+
+        captor.getValue().toPredicate(root, (CriteriaQuery<?>) query, cb);
+        return cb;
     }
 
     /**
@@ -435,8 +513,9 @@ class BusinessServiceTest {
             allBusinesses.add(business);
         }
 
-        when(businessRepository.findAll(any(Pageable.class))).thenAnswer(invocation -> {
-            Pageable pageable = invocation.getArgument(0);
+        when(businessRepository.findAll(ArgumentMatchers.<Specification<Business>>any(), any(Pageable.class)))
+                .thenAnswer(invocation -> {
+            Pageable pageable = invocation.getArgument(1);
             int from = (int) pageable.getOffset();
             int to = Math.min(from + pageable.getPageSize(), allBusinesses.size());
             return new PageImpl<>(allBusinesses.subList(from, to), pageable, allBusinesses.size());

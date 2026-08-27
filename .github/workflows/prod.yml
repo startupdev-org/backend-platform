@@ -29,8 +29,18 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Run tests
-        run: mvn -B test
+      # The project's only compile. `verify` runs the full test suite (output stays
+      # visible in this step's log) and produces target/app.jar, which the image
+      # consumes via JAR_SOURCE=prebuilt instead of compiling a second time inside
+      # the Docker build. A failing test fails this step, and every step after it —
+      # build, scan, push, deploy — is skipped, so a red build still cannot ship.
+      - name: Build and test
+        run: mvn -B verify
+
+      # cache-from/cache-to type=gha need the docker-container driver, which the
+      # runner's default builder is not.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -39,16 +49,51 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Two tags: :latest for the Render service to track, and the immutable
-      # commit SHA so a rollback has something concrete to point at.
-      - name: Build and push Docker image
+      # Built into the local daemon only, so Trivy below can gate it before anything
+      # reaches the registry. The push step afterwards is this same build with every
+      # layer already cached, so it only uploads.
+      #
+      # Two tags: :latest for the Render service to track, and the immutable commit
+      # SHA so a rollback has something concrete to point at.
+      - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
+          build-args: |
+            JAR_SOURCE=prebuilt
+          load: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Fails the job on HIGH/CRITICAL findings that have a fix available.
+      # ignore-unfixed keeps an unpatched base-image CVE — which nobody can act on —
+      # from permanently red-lighting every deploy. The action is pinned to a release
+      # tag rather than @master; bump it deliberately.
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+
+      - name: Push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          build-args: |
+            JAR_SOURCE=prebuilt
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          sbom: true
+          provenance: true
 
       - name: Deploy on Render
         run: curl --fail --silent --show-error "$DEPLOY_URL"

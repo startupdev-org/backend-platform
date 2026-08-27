@@ -65,6 +65,9 @@ class BusinessServiceTest {
     private FeatureService featureService;
 
     @Mock
+    private com.platform.repository.BusinessWorkingHoursRepository workingHoursRepository;
+
+    @Mock
     private ImageUrlResolver imageUrls;
 
     private static final String TEST_EMAIL = "test@gmail.com";
@@ -86,6 +89,21 @@ class BusinessServiceTest {
     // ----------------------------
     // Helpers
     // ----------------------------
+
+    /**
+     * Stubs the batch child-collection loads that {@code listBusinesses} /
+     * {@code getUserBusinesses} / {@code listBusinessesByQuery} now use instead of
+     * one query per business (BP-53). Empty collections are enough for the list
+     * tests, which assert on paging and filter predicates, not on child content.
+     */
+    private void stubBatchDtoLoads(User owner) {
+        when(providedServicesService.getServicesByBusinessIds(anyCollection())).thenReturn(Map.of());
+        when(employeeService.getEmployeesByBusinessIds(anyCollection())).thenReturn(Map.of());
+        when(featureService.getFeaturesByBusinessIds(anyCollection())).thenReturn(Map.of());
+        when(locationService.getLocationsByBusinessIds(anyCollection())).thenReturn(Map.of());
+        when(workingHoursRepository.findByBusinessIdIn(anyCollection())).thenReturn(List.of());
+        when(userService.getUsersByIds(anyCollection())).thenReturn(Map.of(owner.getId(), owner));
+    }
 
     private User createBusinessAdmin() {
         return User.builder()
@@ -402,17 +420,7 @@ class BusinessServiceTest {
         when(businessRepository.findAll(ArgumentMatchers.<Specification<Business>>any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(business)));
 
-        when(providedServicesService.getBusinessServices(business.getId()))
-                .thenReturn(List.of());
-
-        when(userService.getUserById(owner.getId()))
-                .thenReturn(owner);
-
-        when(employeeService.getBusinessEmployeesList(business.getId()))
-                .thenReturn(List.of());
-
-        when(locationService.getLocationsForBusiness(any()))
-                .thenReturn(createLocationResponseDTOList());
+        stubBatchDtoLoads(owner);
 
         Page<BusinessResponseDTO> page =
                 businessService.listBusinesses(
@@ -427,6 +435,41 @@ class BusinessServiceTest {
         CriteriaBuilder cb = evaluateCapturedSpecification();
         verify(cb).like(any(), eq("%chisinau%"));
         verify(cb).equal(any(), eq(BusinessCategoryType.BARBERSHOP));
+    }
+
+    /**
+     * BP-53: the list path must batch its child lookups by business id. It calls the
+     * *ByBusinessIds methods once for the whole page and never the per-business
+     * getBusinessServices / getBusinessEmployeesList / getAllFeatures /
+     * getLocationsForBusiness / getUserById that toDTO uses for a single business.
+     */
+    @Test
+    void listBusinesses_batchesChildLookups_noPerBusinessQueries() {
+
+        User owner = createBusinessAdmin();
+        List<Business> businesses = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            businesses.add(createBusiness(owner));
+        }
+
+        when(businessRepository.findAll(ArgumentMatchers.<Specification<Business>>any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(businesses));
+        stubBatchDtoLoads(owner);
+
+        businessService.listBusinesses(null, null, null, PageRequest.of(0, 10));
+
+        verify(providedServicesService, times(1)).getServicesByBusinessIds(anyCollection());
+        verify(employeeService, times(1)).getEmployeesByBusinessIds(anyCollection());
+        verify(featureService, times(1)).getFeaturesByBusinessIds(anyCollection());
+        verify(locationService, times(1)).getLocationsByBusinessIds(anyCollection());
+        verify(userService, times(1)).getUsersByIds(anyCollection());
+        verify(workingHoursRepository, times(1)).findByBusinessIdIn(anyCollection());
+
+        verify(providedServicesService, never()).getBusinessServices(any(UUID.class));
+        verify(employeeService, never()).getBusinessEmployeesList(any());
+        verify(featureService, never()).getAllFeatures(any());
+        verify(locationService, never()).getLocationsForBusiness(any());
+        verify(userService, never()).getUserById(any());
     }
 
     @Test
@@ -521,10 +564,7 @@ class BusinessServiceTest {
             return new PageImpl<>(allBusinesses.subList(from, to), pageable, allBusinesses.size());
         });
 
-        when(providedServicesService.getBusinessServices(any(UUID.class))).thenReturn(List.of());
-        when(userService.getUserById(any())).thenReturn(owner);
-        when(employeeService.getBusinessEmployeesList(any(UUID.class))).thenReturn(List.of());
-        when(locationService.getLocationsForBusiness(any())).thenReturn(createLocationResponseDTOList());
+        stubBatchDtoLoads(owner);
 
         Page<BusinessResponseDTO> firstPage =
                 businessService.listBusinesses(null, null, null, PageRequest.of(0, 10));
@@ -552,10 +592,7 @@ class BusinessServiceTest {
         when(businessRepository.findByNameContainingIgnoreCase("Test", pageable))
                 .thenReturn(new PageImpl<>(List.of(business), pageable, 7));
 
-        when(providedServicesService.getBusinessServices(any(UUID.class))).thenReturn(List.of());
-        when(userService.getUserById(any())).thenReturn(owner);
-        when(employeeService.getBusinessEmployeesList(any(UUID.class))).thenReturn(List.of());
-        when(locationService.getLocationsForBusiness(any())).thenReturn(createLocationResponseDTOList());
+        stubBatchDtoLoads(owner);
 
         Page<BusinessResponseDTO> page = businessService.listBusinessesByQuery("Test", pageable);
 
@@ -669,17 +706,7 @@ class BusinessServiceTest {
         when(businessRepository.findByOwnerId(userId))
                 .thenReturn(List.of(business));
 
-        when(providedServicesService.getBusinessServices(business.getId()))
-                .thenReturn(List.of());
-
-        when(userService.getUserById(owner.getId()))
-                .thenReturn(owner);
-
-        when(employeeService.getBusinessEmployeesList(business.getId()))
-                .thenReturn(List.of());
-
-        when(locationService.getLocationsForBusiness(any()))
-                .thenReturn(createLocationResponseDTOList());
+        stubBatchDtoLoads(owner);
 
         List<BusinessResponseDTO> result =
                 businessService.getUserBusinesses(userId);

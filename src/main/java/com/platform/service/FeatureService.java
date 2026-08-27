@@ -31,11 +31,29 @@ public class FeatureService {
 
         return featureRepository.findByBusinessId(business.getId())
                 .stream()
-                .map(f -> BusinessFeatureDTO.builder()
-                        .featureId(f.getFeatureId())
-                        .businessId(f.getBusiness().getId())
-                        .name(f.getName())
-                        .build()).collect(Collectors.toSet());
+                .map(FeatureService::toDTO)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * Features for many businesses in one query, grouped by business id. The list
+     * endpoints call this once instead of {@link #getAllFeatures(UUID)} per
+     * business. See BP-53.
+     */
+    public Map<UUID, Set<BusinessFeatureDTO>> getFeaturesByBusinessIds(Collection<UUID> businessIds) {
+        if (businessIds.isEmpty()) return Map.of();
+        return featureRepository.findByBusinessIdIn(businessIds).stream()
+                .collect(Collectors.groupingBy(
+                        f -> f.getBusiness().getId(),
+                        Collectors.mapping(FeatureService::toDTO, Collectors.toSet())));
+    }
+
+    private static BusinessFeatureDTO toDTO(BusinessFeature f) {
+        return BusinessFeatureDTO.builder()
+                .featureId(f.getFeatureId())
+                .businessId(f.getBusiness().getId())
+                .name(f.getName())
+                .build();
     }
 
     /**

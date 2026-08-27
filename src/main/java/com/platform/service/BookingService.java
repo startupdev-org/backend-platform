@@ -93,18 +93,18 @@ public class BookingService {
     }
 
     public List<BookingResponseDTO> listBookings(UUID employeeId, Booking.BookingStatus status) {
+        // Fetch the whole graph toDTO touches (priceEntry -> employee/service, review)
+        // in one query per branch, and push the status filter into the database rather
+        // than hydrating every row and filtering in memory. See BP-53.
         List<Booking> bookings;
         if (employeeId != null && status != null) {
-            bookings = bookingRepository.findByEmployeeId(employeeId);
-            bookings = bookings.stream()
-                    .filter(b -> b.getStatus().equals(status))
-                    .collect(Collectors.toList());
+            bookings = bookingRepository.findByEmployeeIdAndStatusForListing(employeeId, status);
         } else if (employeeId != null) {
-            bookings = bookingRepository.findByEmployeeId(employeeId);
+            bookings = bookingRepository.findByEmployeeIdForListing(employeeId);
         } else if (status != null) {
-            bookings = bookingRepository.findByStatus(status);
+            bookings = bookingRepository.findByStatusForListing(status);
         } else {
-            bookings = bookingRepository.findAll();
+            bookings = bookingRepository.findAllForListing();
         }
         return bookings.stream().map(this::toDTO).collect(Collectors.toList());
     }

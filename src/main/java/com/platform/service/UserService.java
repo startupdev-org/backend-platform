@@ -27,10 +27,14 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -146,6 +150,17 @@ public class UserService {
 
     public UserResponseDTO getUserDTOById(UUID id) {
         return toResponseDTO(getUserById(id));
+    }
+
+    /**
+     * Users for many ids in one query, keyed by id. The business list endpoints call
+     * this once to resolve every owner instead of {@link #getUserById(UUID)} per
+     * business. See BP-53.
+     */
+    public Map<UUID, User> getUsersByIds(Collection<UUID> ids) {
+        if (ids.isEmpty()) return Map.of();
+        return userRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
     }
 
     @Transactional

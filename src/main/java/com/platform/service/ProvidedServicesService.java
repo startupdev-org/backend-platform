@@ -14,14 +14,15 @@ import com.platform.repository.BusinessRepository;
 import com.platform.repository.ServiceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -34,6 +35,11 @@ public class ProvidedServicesService {
     private final BookingRepository bookingRepository;
 
     private static final String SERVICE_EXCEPTION = "Service not found";
+
+    /** Whitelisted {@code sort} values for the service list endpoints. */
+    public static final Set<String> SORTABLE_FIELDS =
+            Set.of("name", "price", "durationMinutes", "createdAt", "updatedAt");
+    public static final Sort DEFAULT_SORT = Sort.by(Sort.Direction.ASC, "name");
 
     @Transactional
     public ServiceResponseDTO createService(UUID businessId, ServiceRequestDTO dto) {
@@ -80,19 +86,13 @@ public class ProvidedServicesService {
     }
 
     public Page<ServiceResponseDTO> getBusinessServices(UUID businessId, Pageable pageable) {
-        List<ProvidedService> services = serviceRepository.findByBusinessId(businessId);
-        return new PageImpl<>(
-                services.stream().map(this::toDTO).toList(),
-                pageable,
-                services.size());
+        return serviceRepository.findByBusinessId(businessId, pageable)
+                .map(this::toDTO);
     }
 
     public Page<ServiceResponseDTO> getActiveServices(UUID businessId, Pageable pageable) {
-        List<ProvidedService> services = serviceRepository.findByBusinessIdAndActive(businessId, true);
-        return new PageImpl<>(
-                services.stream().map(this::toDTO).toList(),
-                pageable,
-                services.size());
+        return serviceRepository.findByBusinessIdAndActive(businessId, true, pageable)
+                .map(this::toDTO);
     }
 
     @Transactional

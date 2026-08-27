@@ -20,7 +20,9 @@ import com.platform.exception.BusinessException;
 import com.platform.exception.ResourceNotFoundException;
 import com.platform.storage.ImageUrlResolver;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -390,8 +392,8 @@ class BusinessServiceTest {
         User owner = createBusinessAdmin();
         Business business = createBusiness(owner);
 
-        when(businessRepository.findByCity("Chisinau"))
-                .thenReturn(List.of(business));
+        when(businessRepository.findByCity(eq("Chisinau"), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(business)));
 
         when(providedServicesService.getBusinessServices(business.getId()))
                 .thenReturn(List.of());
@@ -414,6 +416,74 @@ class BusinessServiceTest {
                 );
 
         assertEquals(1, page.getContent().size());
+    }
+
+    /**
+     * The regression this ticket exists for: listBusinesses used to load the whole
+     * table and wrap it in a PageImpl, so every page returned identical content and
+     * totalPages was always 1. The repository stub here slices on the Pageable it is
+     * handed, exactly as Spring Data does, so a service that ignores the Pageable fails.
+     */
+    @Test
+    void listBusinesses_pagesThroughTwentyFiveRows() {
+
+        User owner = createBusinessAdmin();
+        List<Business> allBusinesses = new ArrayList<>();
+        for (int i = 0; i < 25; i++) {
+            Business business = createBusiness(owner);
+            business.setName("Business " + i);
+            allBusinesses.add(business);
+        }
+
+        when(businessRepository.findAll(any(Pageable.class))).thenAnswer(invocation -> {
+            Pageable pageable = invocation.getArgument(0);
+            int from = (int) pageable.getOffset();
+            int to = Math.min(from + pageable.getPageSize(), allBusinesses.size());
+            return new PageImpl<>(allBusinesses.subList(from, to), pageable, allBusinesses.size());
+        });
+
+        when(providedServicesService.getBusinessServices(any(UUID.class))).thenReturn(List.of());
+        when(userService.getUserById(any())).thenReturn(owner);
+        when(employeeService.getBusinessEmployeesList(any(UUID.class))).thenReturn(List.of());
+        when(locationService.getLocationsForBusiness(any())).thenReturn(createLocationResponseDTOList());
+
+        Page<BusinessResponseDTO> firstPage =
+                businessService.listBusinesses(null, null, null, PageRequest.of(0, 10));
+        Page<BusinessResponseDTO> lastPage =
+                businessService.listBusinesses(null, null, null, PageRequest.of(2, 10));
+
+        assertEquals(10, firstPage.getContent().size());
+        assertEquals(5, lastPage.getContent().size());
+        assertEquals(25, firstPage.getTotalElements());
+        assertEquals(3, firstPage.getTotalPages());
+        assertEquals(3, lastPage.getTotalPages());
+
+        assertNotEquals(
+                firstPage.getContent().stream().map(BusinessResponseDTO::getId).toList(),
+                lastPage.getContent().stream().map(BusinessResponseDTO::getId).toList());
+    }
+
+    @Test
+    void listBusinessesByQuery_passesPageableToRepository() {
+
+        User owner = createBusinessAdmin();
+        Business business = createBusiness(owner);
+        PageRequest pageable = PageRequest.of(1, 1);
+
+        when(businessRepository.findByNameContainingIgnoreCase("Test", pageable))
+                .thenReturn(new PageImpl<>(List.of(business), pageable, 7));
+
+        when(providedServicesService.getBusinessServices(any(UUID.class))).thenReturn(List.of());
+        when(userService.getUserById(any())).thenReturn(owner);
+        when(employeeService.getBusinessEmployeesList(any(UUID.class))).thenReturn(List.of());
+        when(locationService.getLocationsForBusiness(any())).thenReturn(createLocationResponseDTOList());
+
+        Page<BusinessResponseDTO> page = businessService.listBusinessesByQuery("Test", pageable);
+
+        assertEquals(1, page.getContent().size());
+        assertEquals(7, page.getTotalElements());
+        assertEquals(7, page.getTotalPages());
+        verify(businessRepository, never()).findByNameContainingIgnoreCase(anyString());
     }
 
     // ----------------------------

@@ -1,6 +1,8 @@
 package com.platform.repository;
 
 import com.platform.entity.ProvidedService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -14,4 +16,7 @@ public interface ServiceRepository extends JpaRepository<ProvidedService, UUID> 
 
     List<ProvidedService> findByBusinessIdIn(Collection<UUID> businessIds);
     List<ProvidedService> findByBusinessIdAndActive(UUID businessId, Boolean active);
+
+    Page<ProvidedService> findByBusinessId(UUID businessId, Pageable pageable);
+    Page<ProvidedService> findByBusinessIdAndActive(UUID businessId, Boolean active, Pageable pageable);
 }

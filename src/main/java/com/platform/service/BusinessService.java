@@ -16,9 +16,8 @@ import com.platform.storage.ImageUrlResolver;
 import com.platform.utils.SlugGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -39,6 +38,11 @@ public class BusinessService {
     private final ImageUrlResolver imageUrls;
 
     private static final String BUSINESS_EXCEPTION = "Business not found";
+
+    /** Whitelisted {@code sort} values for the business list endpoints. */
+    public static final Set<String> SORTABLE_FIELDS =
+            Set.of("name", "city", "ratingOverall", "createdAt", "updatedAt");
+    public static final Sort DEFAULT_SORT = Sort.by(Sort.Direction.DESC, "createdAt");
 
     @Transactional
     public BusinessResponseDTO createBusiness(BusinessRequestDTO dto) {
@@ -82,21 +86,18 @@ public class BusinessService {
     }
 
     public Page<BusinessResponseDTO> listBusinesses(String city, Double minRating, String businessCategoryType, Pageable pageable) {
-        List<Business> businesses;
+        Page<Business> businesses;
         if (city != null && minRating != null) {
-            businesses = businessRepository.findByFilters(city, minRating);
+            businesses = businessRepository.findByFilters(city, minRating, pageable);
         } else if (city != null) {
-            businesses = businessRepository.findByCity(city);
-        } else if(businessCategoryType != null){
-            businesses = businessRepository.findByBusinessCategory(businessCategoryType);
+            businesses = businessRepository.findByCity(city, pageable);
+        } else if (businessCategoryType != null) {
+            businesses = businessRepository.findByBusinessCategory(businessCategoryType, pageable);
         } else {
-            businesses = businessRepository.findAll();
+            businesses = businessRepository.findAll(pageable);
         }
 
-        return new PageImpl<>(
-                businesses.stream().map(this::toDTO).toList(),
-                pageable,
-                businesses.size());
+        return businesses.map(this::toDTO);
     }
 
     @Transactional
@@ -162,13 +163,8 @@ public class BusinessService {
         return userService.getUserByUsername(username);
     }
 
-    public Page<BusinessResponseDTO> listBusinessesByQuery(String query, PageRequest pageable) {
-
-        List<Business> businesses = businessRepository.findByNameContainingIgnoreCase(query);
-
-        return new PageImpl<>(
-                businesses.stream().map(this::toDTO).toList(),
-                pageable,
-                businesses.size());
+    public Page<BusinessResponseDTO> listBusinessesByQuery(String query, Pageable pageable) {
+        return businessRepository.findByNameContainingIgnoreCase(query, pageable)
+                .map(this::toDTO);
     }
 }

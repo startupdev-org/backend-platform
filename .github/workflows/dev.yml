@@ -62,7 +62,7 @@ jobs:
       # from permanently red-lighting every deploy. The action is pinned to a release
       # tag rather than @master; bump it deliberately.
       - name: Scan image for vulnerabilities
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
           format: table

@@ -41,8 +41,12 @@ public class SecurityConfig {
     // authenticated by default and made public only by an explicit edit here.
     // /refresh and /logout are public because the refresh token *is* the credential:
     // the caller's access token has usually already expired by the time they get here.
+    // /forgot-password and /reset-password are public because the caller is by definition
+    // someone who cannot log in. /change-password is deliberately absent: it needs the
+    // session, so it falls through to .anyRequest().authenticated() below.
     private static final String[] PUBLIC_POST_PATTERNS   = {
-            "/api/auth/login", "/api/auth/register", "/api/auth/refresh", "/api/auth/logout" };
+            "/api/auth/login", "/api/auth/register", "/api/auth/refresh", "/api/auth/logout",
+            "/api/auth/forgot-password", "/api/auth/reset-password" };
     private static final String[] PUBLIC_GET_PATTERNS    = {
             "/api/health/**",
             "/swagger-ui/**",

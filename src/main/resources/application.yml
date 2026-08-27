@@ -46,6 +46,16 @@ jwt:
   # Refresh token: 30 days. Revocable, single-use, stored hashed.
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:2592000000}
 
+# Password reset. Single-use tokens, stored hashed, deliberately short-lived: the
+# lifetime is exactly how long a working link sits reachable in an inbox.
+password-reset:
+  expiration: ${PASSWORD_RESET_EXPIRATION:1800000}
+
+# Where the SPA lives, for building the reset link. The only place this service needs
+# to know the frontend's address; everything else is origin-checked through cors.
+app:
+  frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+
 server:
   # Render injects PORT; SERVER_PORT is the local override.
   port: ${PORT:${SERVER_PORT:8080}}

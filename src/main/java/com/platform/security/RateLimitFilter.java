@@ -42,8 +42,14 @@ import java.util.Set;
 @Slf4j
 public class RateLimitFilter extends OncePerRequestFilter {
 
+    // Every path here either checks a credential or hands one out. /change-password is
+    // included even though it is authenticated: it compares the current password and the
+    // per-account lockout does not cover it, so the per-IP throttle is the only bound on
+    // guessing it with a stolen access token.
     private static final Set<String> PROTECTED_PATHS =
-            Set.of("/api/auth/login", "/api/auth/register", "/api/auth/refresh");
+            Set.of("/api/auth/login", "/api/auth/register", "/api/auth/refresh",
+                    "/api/auth/forgot-password", "/api/auth/reset-password",
+                    "/api/auth/change-password");
 
     private final RateLimitProperties properties;
     private final ObjectMapper objectMapper;

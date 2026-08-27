@@ -8,8 +8,12 @@ import com.platform.entity.User;
 import com.platform.exception.AccountLockedException;
 import com.platform.exception.EmailAlreadyRegisteredException;
 import com.platform.exception.InvalidCredentialsException;
+import com.platform.exception.InvalidRefreshTokenException;
+import com.platform.exception.UserNotEnabledException;
+import com.platform.entity.RefreshToken;
 import com.platform.repository.UserRepository;
 import com.platform.utils.JwtUtils;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -45,6 +49,9 @@ class AuthServiceTest {
     @Mock
     private JwtUtils jwtUtils;
 
+    @Mock
+    private RefreshTokenService refreshTokenService;
+
     // Real config with production defaults (lockout after 5, base 15 min).
     @Spy
     private RateLimitProperties rateLimitProperties = new RateLimitProperties();
@@ -53,6 +60,15 @@ class AuthServiceTest {
     private ArgumentCaptor<User> userCaptor;
 
     private static final String IP = "203.0.113.7";
+
+    // Every successful login and register path now issues a refresh token alongside the
+    // access token; lenient so the failure-path tests that never get there still pass.
+    @BeforeEach
+    void stubRefreshTokenIssue() {
+        lenient().when(refreshTokenService.issue(any(User.class)))
+                .thenReturn(new RefreshTokenService.IssuedToken(
+                        "refresh-token", LocalDateTime.now().plusDays(30)));
+    }
 
     private RegisterRequest registerRequest(String email) {
         RegisterRequest request = new RegisterRequest();
@@ -319,5 +335,58 @@ class AuthServiceTest {
         authService.login(request, IP);
 
         verify(userRepository, never()).saveAndFlush(any(User.class));
+    }
+
+    // ==================== refresh ====================
+
+    @Test
+    void refresh_rotatesBothTokens() {
+        User user = persistedUser("test@example.com");
+        RefreshToken spent = RefreshToken.builder().user(user).build();
+
+        when(refreshTokenService.verifyAndConsume("old-refresh")).thenReturn(spent);
+        when(jwtUtils.generateToken(user)).thenReturn("new-jwt");
+        when(jwtUtils.getExpirationInSeconds()).thenReturn(900L);
+
+        LoginResponse response = authService.refresh("old-refresh");
+
+        assertEquals("new-jwt", response.getAccessToken());
+        assertEquals("refresh-token", response.getRefreshToken());
+        assertEquals(900L, response.getExpiresIn());
+        // the spent token records its successor, so a replay can be traced along the chain
+        verify(refreshTokenService).linkSuccessor(spent, "refresh-token");
+    }
+
+    // The one place a disabled account is re-checked against the database - the access
+    // token carries its claims for its whole lifetime.
+    @Test
+    void refresh_disabledUser_isCutOffAndAllSessionsRevoked() {
+        User user = persistedUser("test@example.com");
+        user.setEnabled(false);
+        RefreshToken spent = RefreshToken.builder().user(user).build();
+
+        when(refreshTokenService.verifyAndConsume("old-refresh")).thenReturn(spent);
+
+        assertThrows(UserNotEnabledException.class, () -> authService.refresh("old-refresh"));
+
+        verify(refreshTokenService).revokeAllForUser(user);
+        verify(jwtUtils, never()).generateToken(any());
+    }
+
+    @Test
+    void refresh_invalidToken_propagates() {
+        when(refreshTokenService.verifyAndConsume("bad"))
+                .thenThrow(new InvalidRefreshTokenException("Invalid refresh token"));
+
+        assertThrows(InvalidRefreshTokenException.class, () -> authService.refresh("bad"));
+    }
+
+    // ==================== logout ====================
+
+    @Test
+    void logout_revokesTheRefreshToken() {
+        authService.logout("some-refresh");
+
+        verify(refreshTokenService).revoke("some-refresh");
     }
 }

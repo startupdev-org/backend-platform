@@ -91,6 +91,15 @@ public class GlobalExceptionHandler {
     // for any other authentication failure raised during dispatch. The token is unusable,
     // so this is a 401 - and the message stays generic so it is not a probe oracle.
     // UsernameNotFoundException is an AuthenticationException, so this covers both.
+    // Unknown, expired and already-spent all return the same body: telling them apart
+    // would help whoever is holding a stolen token work out what they have.
+    @ExceptionHandler(InvalidRefreshTokenException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidRefreshToken(
+            InvalidRefreshTokenException ex, WebRequest request) {
+        log.warn("Refresh token rejected on {}", path(request));
+        return build(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token", request);
+    }
+
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ErrorResponse> handleAuthenticationFailure(
             AuthenticationException ex, WebRequest request) {

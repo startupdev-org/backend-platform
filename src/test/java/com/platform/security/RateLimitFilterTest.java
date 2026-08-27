@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
@@ -36,7 +38,11 @@ class RateLimitFilterTest {
     }
 
     private MockHttpServletRequest loginRequest(String ip) {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/auth/login");
+        return postRequest("/api/auth/login", ip);
+    }
+
+    private MockHttpServletRequest postRequest(String path, String ip) {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", path);
         request.setRemoteAddr(ip);
         return request;
     }
@@ -102,5 +108,33 @@ class RateLimitFilterTest {
         }
         verify(chain, times(5)).doFilter(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
         verify(chain, never()).doFilter(null, null);
+    }
+
+    /**
+     * BP-38 requires the recovery endpoints to sit behind the same throttle as login -
+     * forgot-password otherwise mails an unbounded number of links, and reset-password
+     * is a guessable token in a query string. change-password is here too: it compares
+     * the current password, and the per-account lockout in AuthService only covers login.
+     */
+    @Test
+    void throttlesThePasswordEndpoints() throws Exception {
+        List<String> paths = List.of(
+                "/api/auth/forgot-password",
+                "/api/auth/reset-password",
+                "/api/auth/change-password");
+
+        for (int p = 0; p < paths.size(); p++) {
+            String path = paths.get(p);
+            String ip = "198.51.100." + (p + 1);   // a fresh bucket per path
+
+            for (int i = 0; i < 2; i++) {          // capacity is 2 in this fixture
+                filter.doFilter(postRequest(path, ip), new MockHttpServletResponse(), chain);
+            }
+
+            MockHttpServletResponse blocked = new MockHttpServletResponse();
+            filter.doFilter(postRequest(path, ip), blocked, chain);
+
+            assertEquals(429, blocked.getStatus(), path + " must be rate limited");
+        }
     }
 }

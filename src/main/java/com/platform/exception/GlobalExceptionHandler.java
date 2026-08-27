@@ -159,6 +159,16 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
     }
 
+    // Unknown, expired and already-used reset tokens all return this same body. A 400
+    // rather than a 401: the caller is anonymous by definition here, and there is no
+    // credential for them to retry with - the link is simply spent.
+    @ExceptionHandler(InvalidPasswordResetTokenException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidPasswordResetToken(
+            InvalidPasswordResetTokenException ex, WebRequest request) {
+        log.warn("Password reset token rejected on {}", path(request));
+        return build(HttpStatus.BAD_REQUEST, "Invalid or expired password reset token", request);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(
             MethodArgumentNotValidException ex, WebRequest request) {

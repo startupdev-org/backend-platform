@@ -137,4 +137,35 @@ class RateLimitFilterTest {
             assertEquals(429, blocked.getStatus(), path + " must be rate limited");
         }
     }
+
+    /**
+     * BP-46 opens POST /api/booking to anonymous callers, so it must sit behind the
+     * same per-IP throttle - otherwise it is an unbounded booking-spam target.
+     */
+    @Test
+    void throttlesAnonymousBookingCreation() throws Exception {
+        String ip = "198.51.100.42";
+        for (int i = 0; i < 2; i++) {   // capacity is 2 in this fixture
+            filter.doFilter(postRequest("/api/booking", ip), new MockHttpServletResponse(), chain);
+        }
+
+        MockHttpServletResponse blocked = new MockHttpServletResponse();
+        filter.doFilter(postRequest("/api/booking", ip), blocked, chain);
+
+        assertEquals(429, blocked.getStatus());
+        ErrorResponse body = objectMapper.readValue(blocked.getContentAsString(), ErrorResponse.class);
+        assertEquals("/api/booking", body.getPath());
+    }
+
+    @Test
+    void doesNotThrottleBookingReadsOrOtherBookingPaths() throws Exception {
+        MockHttpServletRequest get = new MockHttpServletRequest("GET", "/api/booking");
+        get.setRemoteAddr("198.51.100.43");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(get, response, chain);
+
+        verify(chain).doFilter(get, response);
+        assertEquals(200, response.getStatus());
+    }
 }

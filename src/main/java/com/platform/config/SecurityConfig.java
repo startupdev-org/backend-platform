@@ -37,6 +37,10 @@ public class SecurityConfig {
     private static final String ROLE_BUSINESS_ADMIN = "BUSINESS_ADMIN";
 
     // ── Public endpoints ──────────────────────────────────────────────────────
+    // This is the single, deliberate statement of what an anonymous visitor may
+    // reach. Everything not listed here (or marked permitAll in a matcher below)
+    // falls through to .anyRequest().authenticated().
+    //
     // Specific paths, not "/api/auth/**": a new POST under /api/auth is then
     // authenticated by default and made public only by an explicit edit here.
     // /refresh and /logout are public because the refresh token *is* the credential:
@@ -44,9 +48,12 @@ public class SecurityConfig {
     // /forgot-password and /reset-password are public because the caller is by definition
     // someone who cannot log in. /change-password is deliberately absent: it needs the
     // session, so it falls through to .anyRequest().authenticated() below.
+    // /api/booking is public because customers book without an account (BP-46); it is
+    // throttled per IP by RateLimitFilter, like the other public POSTs.
     private static final String[] PUBLIC_POST_PATTERNS   = {
             "/api/auth/login", "/api/auth/register", "/api/auth/refresh", "/api/auth/logout",
-            "/api/auth/forgot-password", "/api/auth/reset-password" };
+            "/api/auth/forgot-password", "/api/auth/reset-password",
+            "/api/booking" };
     private static final String[] PUBLIC_GET_PATTERNS    = {
             "/api/health/**",
             "/swagger-ui/**",
@@ -55,6 +62,14 @@ public class SecurityConfig {
             "/swagger-ui.html",
             "/config"
     };
+
+    // The public booking page reads a business and its sub-resources with no login.
+    // These GETs are permitAll in the matchers below; they are gathered here so the
+    // anonymous read surface is visible in one place:
+    //   GET /api/business, /api/business/{id}, /api/business/slug/{slug}  (section 7)
+    //   GET /api/business/{id}/employee, /employee/** (incl. availability) (section 3)
+    //   GET /api/business/{id}/location, /location/**                     (section 6b)
+    //   GET /api/business/{id}/service, /service/**                       (section 6)
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -108,7 +123,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/business/*/features/**")   .hasRole(ROLE_BUSINESS_ADMIN)
 
                         // ── 6. Service endpoints ──────────────────────────────────────
-                        .requestMatchers(HttpMethod.GET,    "/api/business/*/service")       .authenticated()
+                        // Public, like locations and employees: the booking page lists a
+                        // business's services with no login (BP-46). /service/{id} and
+                        // /service/active were already public via the section 7 catch-all.
+                        .requestMatchers(HttpMethod.GET,    "/api/business/*/service")       .permitAll()
 
                         // ── 6b. Location endpoints ────────────────────────────────────
                         .requestMatchers(HttpMethod.POST,   "/api/business/*/location")      .hasRole(ROLE_BUSINESS_ADMIN)
@@ -149,8 +167,16 @@ public class SecurityConfig {
 
 
                         // ── 9. Booking & Review endpoints ─────────────────────────────
-                        .requestMatchers(HttpMethod.POST,   "/api/booking")                  .authenticated()
-                        .requestMatchers(HttpMethod.GET,    "/api/booking/**")               .authenticated()
+                        // POST /api/booking is public (customers book without an account) -
+                        // it is in PUBLIC_POST_PATTERNS above, matched before this section.
+                        // Every other booking route is management data: reads and mutations
+                        // are role-gated here and ownership-scoped in BookingService (BP-29).
+                        // PATCH and DELETE are stated explicitly rather than left to the
+                        // .anyRequest() fallback, which would let any authenticated account
+                        // re-status or cancel anyone's booking.
+                        .requestMatchers(HttpMethod.PATCH,  "/api/booking/*/status")         .hasAnyRole(ROLE_BUSINESS_ADMIN, ROLE_PLATFORM_ADMIN)
+                        .requestMatchers(HttpMethod.DELETE, "/api/booking/*")                .hasAnyRole(ROLE_BUSINESS_ADMIN, ROLE_PLATFORM_ADMIN)
+                        .requestMatchers(HttpMethod.GET,    "/api/booking/**")               .hasAnyRole(ROLE_BUSINESS_ADMIN, ROLE_PLATFORM_ADMIN)
                         .requestMatchers(HttpMethod.POST,   "/api/review/booking/**")        .authenticated()
                         .requestMatchers(HttpMethod.GET,    "/api/review/business/**")       .authenticated()
 

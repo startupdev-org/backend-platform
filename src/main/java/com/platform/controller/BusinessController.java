@@ -3,8 +3,8 @@ package com.platform.controller;
 import com.platform.dto.business.BusinessRequestDTO;
 import com.platform.dto.business.BusinessResponseDTO;
 import com.platform.entity.User;
+import com.platform.security.CurrentUser;
 import com.platform.service.BusinessService;
-import com.platform.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -16,7 +16,6 @@ import org.springframework.data.domain.Page;
 import com.platform.utils.PageRequests;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -30,7 +29,6 @@ import java.util.UUID;
 public class BusinessController {
 
     private final BusinessService businessService;
-    private final UserService userService;
 
     @Operation(summary = "List businesses", description = "Returns a paginated list of businesses, optionally filtered by city and minimum rating")
     @ApiResponse(responseCode = "200", description = "Businesses retrieved successfully")
@@ -96,8 +94,9 @@ public class BusinessController {
     @ApiResponse(responseCode = "403", description = "Not authorized to create a business")
     @PostMapping
     public ResponseEntity<BusinessResponseDTO> createBusiness(
-            @Valid @RequestBody BusinessRequestDTO request) {
-        BusinessResponseDTO business = businessService.createBusiness(request);
+            @Valid @RequestBody BusinessRequestDTO request,
+            @CurrentUser User currentUser) {
+        BusinessResponseDTO business = businessService.createBusiness(request, currentUser);
         return new ResponseEntity<>(business, HttpStatus.CREATED);
     }
 
@@ -110,8 +109,9 @@ public class BusinessController {
     public ResponseEntity<BusinessResponseDTO> updateBusiness(
             @Parameter(description = "Business UUID")
             @PathVariable UUID id,
-            @Valid @RequestBody BusinessRequestDTO request) {
-        BusinessResponseDTO business = businessService.updateBusiness(id, request);
+            @Valid @RequestBody BusinessRequestDTO request,
+            @CurrentUser User currentUser) {
+        BusinessResponseDTO business = businessService.updateBusiness(id, request, currentUser);
         return ResponseEntity.ok(business);
     }
 
@@ -123,8 +123,7 @@ public class BusinessController {
     public ResponseEntity<Void> deleteBusiness(
             @Parameter(description = "Business UUID")
             @PathVariable UUID id,
-            Authentication authentication) {
-        User currentUser = userService.getUserByUsername(authentication.getName());
+            @CurrentUser User currentUser) {
         businessService.deleteBusiness(id, currentUser);
         return ResponseEntity.noContent().build();
     }
@@ -133,8 +132,7 @@ public class BusinessController {
     @ApiResponse(responseCode = "200", description = "Businesses retrieved successfully")
     @ApiResponse(responseCode = "403", description = "Not authenticated")
     @GetMapping("/user/my-businesses")
-    public ResponseEntity<List<BusinessResponseDTO>> getUserBusinesses(Authentication authentication) {
-        User currentUser = userService.getUserByUsername(authentication.getName());
+    public ResponseEntity<List<BusinessResponseDTO>> getUserBusinesses(@CurrentUser User currentUser) {
         List<BusinessResponseDTO> businesses = businessService.getUserBusinesses(currentUser.getId());
         return ResponseEntity.ok(businesses);
     }

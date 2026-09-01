@@ -301,9 +301,6 @@ class BusinessServiceTest {
         User owner = createBusinessAdmin();
         BusinessRequestDTO dto = createRequest();
 
-        when(userService.getUserByUsername(owner.getEmail()))
-                .thenReturn(owner);
-
         when(businessRepository.save(any()))
                 .thenAnswer(i -> i.getArgument(0));
 
@@ -317,7 +314,7 @@ class BusinessServiceTest {
                 .thenReturn(createLocationResponseDTOList());
 
         BusinessResponseDTO response =
-                businessService.createBusiness(dto);
+                businessService.createBusiness(dto, owner);
 
         assertNotNull(response);
         assertEquals(dto.getName(), response.getName());
@@ -332,11 +329,8 @@ class BusinessServiceTest {
         BusinessRequestDTO dto = createRequest();
 
 
-        when(userService.getUserByUsername(platformAdmin.getEmail()))
-                .thenReturn(platformAdmin);
-
         assertThrows(BusinessException.class, () ->
-                businessService.createBusiness(dto));
+                businessService.createBusiness(dto, platformAdmin));
 
         verify(businessRepository, never()).save(any());
     }
@@ -629,9 +623,6 @@ class BusinessServiceTest {
         User owner = createBusinessAdmin();
         Business business = createBusiness(owner);
 
-        when(userService.getUserByUsername(owner.getEmail()))
-                .thenReturn(owner);
-
         when(businessRepository.findById(business.getId()))
                 .thenReturn(Optional.of(business));
 
@@ -653,7 +644,8 @@ class BusinessServiceTest {
         BusinessResponseDTO dto =
                 businessService.updateBusiness(
                         business.getId(),
-                        createRequest()
+                        createRequest(),
+                        owner
                 );
 
         assertEquals("Test Business", dto.getName());
@@ -670,9 +662,6 @@ class BusinessServiceTest {
 
         User otherUser = createBusinessAdmin();
 
-        when(userService.getUserByUsername(owner.getEmail()))
-                .thenReturn(otherUser);
-
         when(businessRepository.findById(business.getId()))
                 .thenReturn(Optional.of(business));
 
@@ -681,7 +670,8 @@ class BusinessServiceTest {
                 BusinessException.class,
                 () -> businessService.updateBusiness(
                         businessId,
-                        request
+                        request,
+                        otherUser
                 )
         );
     }

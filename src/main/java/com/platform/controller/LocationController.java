@@ -3,8 +3,8 @@ package com.platform.controller;
 import com.platform.dto.location.LocationRequestDTO;
 import com.platform.dto.location.LocationResponseDTO;
 import com.platform.entity.User;
+import com.platform.security.CurrentUser;
 import com.platform.service.LocationService;
-import com.platform.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -15,7 +15,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -35,7 +34,6 @@ import java.util.UUID;
 public class LocationController {
 
     private final LocationService locationService;
-    private final UserService userService;
 
     @Operation(summary = "Create a location",
             description = "Adds a location to the business. Only the owner may call this.")
@@ -50,8 +48,7 @@ public class LocationController {
             @Parameter(description = "Business UUID", example = "123e4567-e89b-12d3-a456-426614174000")
             @PathVariable UUID businessId,
             @Valid @RequestBody LocationRequestDTO requestDTO,
-            Authentication authentication) {
-        User currentUser = userService.getUserByUsername(authentication.getName());
+            @CurrentUser User currentUser) {
         LocationResponseDTO responseDTO = locationService.createLocation(businessId, requestDTO, currentUser);
         return new ResponseEntity<>(responseDTO, HttpStatus.CREATED);
     }
@@ -99,8 +96,7 @@ public class LocationController {
             @Parameter(description = "Location UUID")
             @PathVariable UUID locationId,
             @Valid @RequestBody LocationRequestDTO requestDTO,
-            Authentication authentication) {
-        User currentUser = userService.getUserByUsername(authentication.getName());
+            @CurrentUser User currentUser) {
         LocationResponseDTO updatedLocation = locationService.updateLocation(businessId, locationId, requestDTO, currentUser);
         return ResponseEntity.ok(updatedLocation);
     }
@@ -119,8 +115,7 @@ public class LocationController {
             @PathVariable UUID businessId,
             @Parameter(description = "Location UUID")
             @PathVariable UUID locationId,
-            Authentication authentication) {
-        User currentUser = userService.getUserByUsername(authentication.getName());
+            @CurrentUser User currentUser) {
         locationService.deleteLocation(businessId, locationId, currentUser);
         return ResponseEntity.noContent().build();
     }

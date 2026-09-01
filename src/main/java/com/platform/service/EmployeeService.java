@@ -12,12 +12,11 @@ import com.platform.repository.BookingRepository;
 import com.platform.repository.BusinessRepository;
 import com.platform.repository.EmployeeRepository;
 import com.platform.storage.ImageUrlResolver;
+import com.platform.utils.BusinessOwnershipValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,7 +34,6 @@ public class EmployeeService {
     private final EmployeeRepository employeeRepository;
     private final BusinessRepository businessRepository;
     private final BookingRepository bookingRepository;
-    private final UserService userService;
     private final ImageUrlResolver imageUrls;
 
     private static final String BUSINESS_EXCEPTION = "Business not found";
@@ -47,13 +45,11 @@ public class EmployeeService {
     public static final Sort DEFAULT_SORT = Sort.by(Sort.Direction.ASC, "createdAt");
 
     @Transactional
-    public EmployeeResponseDTO createEmployee(UUID businessId, EmployeeRequestDTO dto) {
+    public EmployeeResponseDTO createEmployee(UUID businessId, EmployeeRequestDTO dto, User currentUser) {
         Business business = businessRepository.findById(businessId)
                 .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_EXCEPTION));
 
-        User currentUser = getUser();
-
-        validateBusinessOwnership(business, currentUser);
+        BusinessOwnershipValidator.assertOwner(business, currentUser);
 
         Employee employee = Employee.builder()
                 .firstName(dto.getFirstName())
@@ -123,7 +119,7 @@ public class EmployeeService {
         Business business = businessRepository.findById(businessId)
                 .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_EXCEPTION));
 
-        validateBusinessOwnership(business, currentUser);
+        BusinessOwnershipValidator.assertOwner(business, currentUser);
 
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException(EMPLOYEE_NOT_FOUND_EXCEPTION));
@@ -151,7 +147,7 @@ public class EmployeeService {
         Business business = businessRepository.findById(businessId)
                 .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_EXCEPTION));
 
-        validateBusinessOwnership(business, currentUser);
+        BusinessOwnershipValidator.assertOwner(business, currentUser);
 
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException(EMPLOYEE_NOT_FOUND_EXCEPTION));
@@ -178,13 +174,6 @@ public class EmployeeService {
         employeeRepository.delete(employee);
     }
 
-    private void validateBusinessOwnership(Business business, User currentUser) {
-        if (!business.getOwner().getId().equals(currentUser.getId()) &&
-            !currentUser.getRole().equals(User.UserRole.PLATFORM_ADMIN)) {
-            throw new BusinessException("Unauthorized");
-        }
-    }
-
     private void validateEmployeeVisibleToCaller(Employee employee, User currentUser) {
         if (!Boolean.TRUE.equals(employee.getEnabled()) &&
             !currentUser.getRole().equals(User.UserRole.PLATFORM_ADMIN)) {
@@ -202,13 +191,4 @@ public class EmployeeService {
         return EmployeeMapper.toDTO(employee, imageUrls);
     }
 
-    private User getUser() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        String username = (String) auth.getPrincipal();
-        return getUserByUsername(username);
-    }
-
-    private User getUserByUsername(String username) {
-        return userService.getUserByUsername(username);
-    }
 }

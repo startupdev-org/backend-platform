@@ -8,7 +8,6 @@ import com.platform.entity.Business;
 import com.platform.entity.Employee;
 import com.platform.entity.User;
 import com.platform.exception.BadRequestException;
-import com.platform.exception.BusinessException;
 import com.platform.exception.ResourceNotFoundException;
 import com.platform.exception.StorageException;
 import com.platform.repository.BusinessRepository;
@@ -19,6 +18,7 @@ import com.platform.storage.StorageProperties;
 import com.platform.storage.StorageProvider;
 import com.platform.storage.StoredObject;
 import com.platform.storage.UploadTarget;
+import com.platform.utils.BusinessOwnershipValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -146,7 +146,7 @@ public class ImageService {
     private Business requireOwnedBusiness(UUID businessId, User currentUser) {
         Business business = businessRepository.findById(businessId)
                 .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_NOT_FOUND));
-        validateBusinessOwnership(business, currentUser);
+        BusinessOwnershipValidator.assertOwner(business, currentUser);
         return business;
     }
 
@@ -162,13 +162,6 @@ public class ImageService {
             throw new ResourceNotFoundException(EMPLOYEE_NOT_FOUND);
         }
         return employee;
-    }
-
-    private void validateBusinessOwnership(Business business, User currentUser) {
-        if (business.isNotOwner(currentUser) &&
-                !currentUser.getRole().equals(User.UserRole.PLATFORM_ADMIN)) {
-            throw new BusinessException("Unauthorized");
-        }
     }
 
     private void requireBusinessTarget(ImageTarget target) {

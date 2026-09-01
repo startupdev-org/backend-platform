@@ -6,20 +6,18 @@ import com.platform.entity.Booking;
 import com.platform.entity.Business;
 import com.platform.entity.ProvidedService;
 import com.platform.entity.User;
-import com.platform.exception.BusinessException;
 import com.platform.exception.ResourceNotFoundException;
 import com.platform.exception.ServiceNotFoundException;
 import com.platform.repository.BookingRepository;
 import com.platform.repository.BusinessRepository;
 import com.platform.repository.ServiceRepository;
 import com.platform.repository.spec.ServiceSpecifications;
+import com.platform.utils.BusinessOwnershipValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,7 +33,6 @@ import java.util.stream.Collectors;
 public class ProvidedServicesService {
 
     private final ServiceRepository serviceRepository;
-    private final UserService userService;
     private final BusinessRepository businessRepository;
     private final BookingRepository bookingRepository;
 
@@ -47,15 +44,11 @@ public class ProvidedServicesService {
     public static final Sort DEFAULT_SORT = Sort.by(Sort.Direction.ASC, "name");
 
     @Transactional
-    public ServiceResponseDTO createService(UUID businessId, ServiceRequestDTO dto) {
-
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    public ServiceResponseDTO createService(UUID businessId, ServiceRequestDTO dto, User currentUser) {
 
         Business business = getBusinessById(businessId);
 
-        User user = userService.getUserByUsername(authentication.getName());
-
-        validateBusinessOwnership(business, user);
+        BusinessOwnershipValidator.assertOwner(business, currentUser);
 
         ProvidedService providedService = ProvidedService.builder()
                 .name(dto.getName())
@@ -137,16 +130,11 @@ public class ProvidedServicesService {
     }
 
     @Transactional
-    public ServiceResponseDTO updateService(UUID businessId, UUID serviceId, ServiceRequestDTO dto) {
-
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    public ServiceResponseDTO updateService(UUID businessId, UUID serviceId, ServiceRequestDTO dto, User currentUser) {
 
         Business business = getBusinessById(businessId);
 
-        User user = userService.getUserByUsername(authentication.getName());
-
-        validateBusinessOwnership(business, user);
-
+        BusinessOwnershipValidator.assertOwner(business, currentUser);
 
         ProvidedService providedService = serviceRepository.findById(serviceId)
                 .orElseThrow(() -> new ResourceNotFoundException(SERVICE_EXCEPTION));
@@ -168,7 +156,7 @@ public class ProvidedServicesService {
 
         Business business = getBusinessById(businessId);
 
-        validateBusinessOwnership(business, currentUser);
+        BusinessOwnershipValidator.assertOwner(business, currentUser);
 
         ProvidedService providedService = serviceRepository.findById(serviceId)
                 .orElseThrow(() -> new ResourceNotFoundException(SERVICE_EXCEPTION));
@@ -177,13 +165,6 @@ public class ProvidedServicesService {
         bookingRepository.deleteAll(serviceBookings);
 
         serviceRepository.delete(providedService);
-    }
-
-    private void validateBusinessOwnership(Business business, User currentUser) {
-        if (!business.getOwner().getId().equals(currentUser.getId()) &&
-            !currentUser.getRole().equals(User.UserRole.PLATFORM_ADMIN)) {
-            throw new BusinessException("Unauthorized");
-        }
     }
 
     private Business getBusinessById(UUID businessId) {

@@ -5,10 +5,10 @@ import com.platform.dto.location.LocationResponseDTO;
 import com.platform.entity.Business;
 import com.platform.entity.Location;
 import com.platform.entity.User;
-import com.platform.exception.BusinessException;
 import com.platform.exception.ResourceNotFoundException;
 import com.platform.repository.BusinessRepository;
 import com.platform.repository.LocationRepository;
+import com.platform.utils.BusinessOwnershipValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -33,7 +33,7 @@ public class LocationService {
         Business business = businessRepository.findById(businessId)
                 .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_NOT_FOUND));
 
-        validateBusinessOwnership(business, currentUser);
+        BusinessOwnershipValidator.assertOwner(business, currentUser);
 
         Location location = Location.builder()
                 .business(business)
@@ -82,7 +82,7 @@ public class LocationService {
         Business business = businessRepository.findById(businessId)
                 .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_NOT_FOUND));
 
-        validateBusinessOwnership(business, currentUser);
+        BusinessOwnershipValidator.assertOwner(business, currentUser);
 
         Location location = getLocationForBusiness(businessId, locationId);
 
@@ -103,7 +103,7 @@ public class LocationService {
         Business business = businessRepository.findById(businessId)
                 .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_NOT_FOUND));
 
-        validateBusinessOwnership(business, currentUser);
+        BusinessOwnershipValidator.assertOwner(business, currentUser);
 
         Location location = getLocationForBusiness(businessId, locationId);
         locationRepository.delete(location);
@@ -118,13 +118,6 @@ public class LocationService {
         }
 
         return location;
-    }
-
-    private void validateBusinessOwnership(Business business, User currentUser) {
-        if (business.isNotOwner(currentUser) &&
-                !currentUser.getRole().equals(User.UserRole.PLATFORM_ADMIN)) {
-            throw new BusinessException("Unauthorized");
-        }
     }
 
     // Mapper

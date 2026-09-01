@@ -3,8 +3,8 @@ package com.platform.controller;
 import com.platform.dto.EmployeeLocationServicePriceRequestDTO;
 import com.platform.dto.EmployeeLocationServicePriceResponseDTO;
 import com.platform.entity.User;
+import com.platform.security.CurrentUser;
 import com.platform.service.EmployeeLocationServicePriceService;
-import com.platform.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -14,7 +14,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -36,7 +35,6 @@ import java.util.UUID;
 public class EmployeeLocationServicePriceController {
 
     private final EmployeeLocationServicePriceService priceService;
-    private final UserService userService;
 
     @Operation(summary = "Create a price entry",
             description = "Sets the price for one employee, service and location combination")
@@ -51,8 +49,7 @@ public class EmployeeLocationServicePriceController {
             @Parameter(description = "Business UUID", example = "123e4567-e89b-12d3-a456-426614174000")
             @PathVariable UUID businessId,
             @Valid @RequestBody EmployeeLocationServicePriceRequestDTO dto,
-            Authentication authentication) {
-        User currentUser = userService.getUserByUsername(authentication.getName());
+            @CurrentUser User currentUser) {
         return ResponseEntity.status(HttpStatus.CREATED).body(priceService.create(businessId, dto, currentUser));
     }
 
@@ -71,8 +68,7 @@ public class EmployeeLocationServicePriceController {
             @Parameter(description = "Price entry UUID")
             @PathVariable UUID id,
             @Valid @RequestBody EmployeeLocationServicePriceRequestDTO dto,
-            Authentication authentication) {
-        User currentUser = userService.getUserByUsername(authentication.getName());
+            @CurrentUser User currentUser) {
         return ResponseEntity.ok(priceService.update(businessId, id, dto, currentUser));
     }
 
@@ -133,8 +129,7 @@ public class EmployeeLocationServicePriceController {
             @PathVariable UUID businessId,
             @Parameter(description = "Price entry UUID")
             @PathVariable UUID id,
-            Authentication authentication) {
-        User currentUser = userService.getUserByUsername(authentication.getName());
+            @CurrentUser User currentUser) {
         priceService.delete(businessId, id, currentUser);
         return ResponseEntity.noContent().build();
     }

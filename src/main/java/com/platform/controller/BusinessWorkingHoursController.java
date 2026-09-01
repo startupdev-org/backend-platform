@@ -3,8 +3,8 @@ package com.platform.controller;
 import com.platform.dto.business.CreateWorkingHoursRequest;
 import com.platform.dto.business.BusinessWorkingHoursDTO;
 import com.platform.entity.User;
+import com.platform.security.CurrentUser;
 import com.platform.service.BusinessWorkingHoursService;
-import com.platform.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -13,7 +13,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -31,7 +30,6 @@ import java.util.UUID;
 public class BusinessWorkingHoursController {
 
     private final BusinessWorkingHoursService service;
-    private final UserService userService;
 
     @Operation(summary = "Add a working-hours interval",
             description = "Adds one opening interval for one weekday. Only the business owner may call this.")
@@ -46,9 +44,8 @@ public class BusinessWorkingHoursController {
             @Parameter(description = "Business UUID", example = "123e4567-e89b-12d3-a456-426614174000")
             @PathVariable UUID businessId,
             @Valid @RequestBody CreateWorkingHoursRequest request,
-            Authentication authentication) {
+            @CurrentUser User currentUser) {
 
-        User currentUser = userService.getUserByUsername(authentication.getName());
         return ResponseEntity.ok(
                 service.create(businessId, request, currentUser)
         );
@@ -83,9 +80,8 @@ public class BusinessWorkingHoursController {
             @Parameter(description = "Working-hours entry ID", example = "1")
             @PathVariable Long id,
             @Valid @RequestBody CreateWorkingHoursRequest request,
-            Authentication authentication) {
+            @CurrentUser User currentUser) {
 
-        User currentUser = userService.getUserByUsername(authentication.getName());
         return ResponseEntity.ok(
                 service.update(businessId, id, request, currentUser)
         );
@@ -103,9 +99,8 @@ public class BusinessWorkingHoursController {
             @PathVariable UUID businessId,
             @Parameter(description = "Working-hours entry ID", example = "1")
             @PathVariable Long id,
-            Authentication authentication) {
+            @CurrentUser User currentUser) {
 
-        User currentUser = userService.getUserByUsername(authentication.getName());
         service.delete(businessId, id, currentUser);
         return ResponseEntity.noContent().build();
     }

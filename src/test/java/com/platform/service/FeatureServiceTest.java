@@ -5,6 +5,7 @@ import com.platform.entity.Business;
 import com.platform.entity.BusinessFeature;
 import com.platform.entity.User;
 import com.platform.exception.BadRequestException;
+import com.platform.exception.BusinessException;
 import com.platform.exception.BusinessFeatureAlreadyExistsException;
 import com.platform.exception.BusinessOwnershipException;
 import com.platform.exception.ResourceNotFoundException;
@@ -31,8 +32,6 @@ class FeatureServiceTest {
     @Mock
     private BusinessRepository businessRepository;
 
-    @Mock
-    private UserService userService;
 
     @InjectMocks
     private FeatureService featureService;
@@ -73,7 +72,6 @@ class FeatureServiceTest {
         Business business = business(owner);
         UUID otherBusinessId = UUID.randomUUID();
 
-        when(userService.getUser()).thenReturn(owner);
 
         BusinessFeatureDTO request = BusinessFeatureDTO.builder()
                 .businessId(otherBusinessId)
@@ -81,7 +79,7 @@ class FeatureServiceTest {
                 .build();
 
         assertThrows(BadRequestException.class,
-                () -> featureService.addFeature(business.getId(), request));
+                () -> featureService.addFeature(business.getId(), request, owner));
 
         verify(featureRepository, never()).save(any());
     }
@@ -91,13 +89,12 @@ class FeatureServiceTest {
         User owner = enabledUser();
         Business business = business(owner);
 
-        when(userService.getUser()).thenReturn(owner);
         when(businessRepository.findById(business.getId())).thenReturn(Optional.of(business));
         when(featureRepository.existsByBusinessIdAndName(business.getId(), "Wi-Fi")).thenReturn(false);
 
         BusinessFeatureDTO response = featureService.addFeature(
                 business.getId(),
-                BusinessFeatureDTO.builder().name("Wi-Fi").build());
+                BusinessFeatureDTO.builder().name("Wi-Fi").build(), owner);
 
         assertEquals(business.getId(), response.getBusinessId());
         verify(featureRepository).save(any(BusinessFeature.class));
@@ -115,12 +112,12 @@ class FeatureServiceTest {
         User owner = enabledUser();
         Business business = business(owner);
 
-        when(userService.getUser()).thenReturn(owner);
         when(businessRepository.findById(business.getId())).thenReturn(Optional.of(business));
         when(featureRepository.existsByBusinessIdAndName(business.getId(), "Wi-Fi")).thenReturn(true);
 
         assertThrows(BusinessFeatureAlreadyExistsException.class,
-                () -> featureService.addFeature(business.getId(), BusinessFeatureDTO.builder().name("Wi-Fi").build()));
+                () -> featureService.addFeature(
+                        business.getId(), BusinessFeatureDTO.builder().name("Wi-Fi").build(), owner));
 
         verify(featureRepository, never()).save(any());
     }
@@ -130,16 +127,15 @@ class FeatureServiceTest {
     // removeFeature had no ownership check at all: any BUSINESS_ADMIN could delete
     // any other business's features.
     @Test
-    void removeFeature_notOwner_throwsOwnership() {
+    void removeFeature_notOwner_throwsBusinessException() {
         User owner = enabledUser();
         User stranger = enabledUser();
         Business business = business(owner);
 
-        when(userService.getUser()).thenReturn(stranger);
         when(businessRepository.findById(business.getId())).thenReturn(Optional.of(business));
 
-        assertThrows(BusinessOwnershipException.class,
-                () -> featureService.removeFeature(business.getId(), 1L));
+        assertThrows(BusinessException.class,
+                () -> featureService.removeFeature(business.getId(), 1L, stranger));
 
         verify(featureRepository, never()).delete(any());
     }
@@ -150,12 +146,11 @@ class FeatureServiceTest {
         Business business = business(owner);
         Business otherBusiness = business(owner);
 
-        when(userService.getUser()).thenReturn(owner);
         when(businessRepository.findById(business.getId())).thenReturn(Optional.of(business));
         when(featureRepository.findById(1L)).thenReturn(Optional.of(feature(otherBusiness)));
 
         assertThrows(ResourceNotFoundException.class,
-                () -> featureService.removeFeature(business.getId(), 1L));
+                () -> featureService.removeFeature(business.getId(), 1L, owner));
 
         verify(featureRepository, never()).delete(any());
     }
@@ -166,11 +161,10 @@ class FeatureServiceTest {
         Business business = business(owner);
         BusinessFeature feature = feature(business);
 
-        when(userService.getUser()).thenReturn(owner);
         when(businessRepository.findById(business.getId())).thenReturn(Optional.of(business));
         when(featureRepository.findById(1L)).thenReturn(Optional.of(feature));
 
-        featureService.removeFeature(business.getId(), 1L);
+        featureService.removeFeature(business.getId(), 1L, owner);
 
         verify(featureRepository).delete(feature);
     }

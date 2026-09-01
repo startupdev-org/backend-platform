@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -19,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * The single highest-value test in BP-61: boots the <b>full</b> Spring context
  * against a real, freshly-migrated Postgres.
  *
- * <p>This alone catches two classes of bug that 318 Mockito unit tests structurally
+ * <p>This alone catches two classes of bug that the Mockito unit tests structurally
  * cannot, because none of them start a Spring context:
  *
  * <ul>
@@ -29,11 +30,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *   <li>Entity/migration drift - {@code spring.jpa.hibernate.ddl-auto: validate}
  *       (see application.yml, inherited unchanged by application-test.yml) makes
  *       Hibernate compare every {@code @Entity} mapping against the schema that
- *       Flyway just built from {@code V1__baseline_schema.sql} through
- *       {@code V9__add_password_reset_tokens.sql}, and refuses to start the
- *       context if they disagree. Context startup failing here is exactly the
- *       signal this ticket exists to produce, in CI, instead of at deploy time.</li>
+ *       Flyway just built from {@code V1__baseline_schema.sql} through the highest
+ *       versioned migration on the classpath, and refuses to start the context if
+ *       they disagree. Context startup failing here is exactly the signal this
+ *       ticket exists to produce, in CI, instead of at deploy time.</li>
  * </ul>
+ *
+ * <p>Flyway itself also refuses to start if two migration files share a version
+ * (the BP-140 collision), so simply reaching the assertions below proves the
+ * migration set is internally consistent. {@link com.platform.migration.MigrationVersioningTest}
+ * guards that statically, without a container, so a duplicate is caught at
+ * {@code mvn test} time rather than only here.
  */
 @SpringBootTest
 class ApplicationContextIntegrationTest extends AbstractIntegrationTest {
@@ -46,13 +53,14 @@ class ApplicationContextIntegrationTest extends AbstractIntegrationTest {
 
     /**
      * If this method runs at all, the context already loaded successfully - which
-     * means Flyway ran V1..V9 against the container and Hibernate's ddl-auto:
-     * validate accepted the result. The body adds a concrete, positive assertion
-     * on top of "did not throw": every migration is recorded as applied and
-     * successful.
+     * means Flyway ran every migration against the container and Hibernate's
+     * {@code ddl-auto: validate} accepted the result. The body adds concrete,
+     * positive assertions on top of "did not throw": every migration is recorded
+     * as applied and successful, and the applied versions form a gap-free
+     * {@code 1..N} sequence with no duplicates.
      */
     @Test
-    void contextLoadsAndAllNineMigrationsApplyCleanly() {
+    void contextLoadsAndEveryMigrationAppliesCleanly() {
         assertNotNull(context);
 
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
@@ -60,14 +68,24 @@ class ApplicationContextIntegrationTest extends AbstractIntegrationTest {
                 "SELECT version, success FROM flyway_schema_history "
                         + "WHERE type != 'BASELINE' ORDER BY installed_rank");
 
-        List<String> versions = rows.stream().map(r -> (String) r.get("version")).toList();
-        assertEquals(
-                List.of("1", "2", "3", "4", "5", "6", "7", "8", "9"),
-                versions,
-                "expected V1..V9 to have been applied, in order, to the fresh container schema");
+        assertFalse(rows.isEmpty(), "expected at least one versioned migration to have been applied");
 
         assertTrue(
                 rows.stream().allMatch(r -> Boolean.TRUE.equals(r.get("success"))),
                 "every migration must be recorded as successful");
+
+        List<Integer> versions = rows.stream()
+                .map(r -> Integer.parseInt((String) r.get("version")))
+                .toList();
+
+        // Applied in ascending order, no duplicates, no gaps: exactly 1..N.
+        List<Integer> expected = java.util.stream.IntStream.rangeClosed(1, versions.size())
+                .boxed()
+                .toList();
+        assertEquals(
+                expected,
+                versions,
+                "expected the applied migrations to be a gap-free 1.." + versions.size()
+                        + " sequence, in order, with no duplicate versions");
     }
 }

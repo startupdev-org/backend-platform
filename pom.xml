@@ -31,6 +31,13 @@
         <aws-sdk.version>2.25.60</aws-sdk.version>
         <!-- 2.3.x is the line that matches Spring Boot 3.2; 2.1.0 targeted Boot 3.0/3.1 -->
         <springdoc.version>2.3.0</springdoc.version>
+        <!-- Overrides the 3.2.0 parent's managed 1.19.3 (BP-61). That version's
+             docker-java client probes the daemon with a hardcoded Docker Engine API
+             version (1.32) that current Docker Engine releases reject outright
+             ("client version 1.32 is too old. Minimum supported API version is
+             1.40"), which fails container startup before any test runs. 1.20.4 lets
+             docker-java negotiate the API version instead of assuming one. -->
+        <testcontainers.version>1.20.4</testcontainers.version>
     </properties>
 
     <dependencyManagement>
@@ -166,6 +173,21 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Testcontainers (BP-61). Versions come from the Spring Boot 3.2 parent's
+             dependencyManagement (spring-boot-testcontainers 3.2.0, testcontainers-bom
+             1.19.3 imported transitively) - do not pin versions here, they would just
+             drift from what the parent already manages. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -191,6 +213,26 @@
                             <version>${mapstruct.version}</version>
                         </path>
                     </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+
+            <!-- Surefire: the api.version system property is the one workaround the
+                 Testcontainers suite needs (BP-61). docker-java's client-provider
+                 strategies ping the daemon with a hardcoded fallback Docker Engine API
+                 version of 1.32 when none is configured; Docker Engine 25+ (and every
+                 GitHub Actions ubuntu-latest runner) rejects anything below 1.40 with
+                 "client version 1.32 is too old". Pinning it here lets docker-java
+                 negotiate from a version the daemon accepts. It is read only when a
+                 Docker client is built - i.e. only by the integration tests - so it is
+                 inert for the ~320 Mockito unit tests. 1.44 is supported by Docker
+                 Engine 25.0+ (Jan 2024); override -Dapi.version on an older daemon. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <api.version>1.44</api.version>
+                    </systemPropertyVariables>
                 </configuration>
             </plugin>
 

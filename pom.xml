@@ -57,6 +57,14 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- Actuator: real liveness/readiness probes for Render (BP-66). Only the
+             health endpoint is ever exposed over HTTP - see management.* in
+             application.yml and the exposure.include note there. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- Spring Security & JWT -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

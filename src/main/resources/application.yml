@@ -102,3 +102,37 @@ logging:
   level:
     root: INFO
     com.platform: INFO
+
+# Actuator (BP-66). Only "health" is ever added to exposure.include - never "*" -
+# so env, beans, mappings, heapdump, and configprops all stay unreachable over HTTP
+# regardless of SecurityConfig. show-details is when-authorized rather than the
+# never default: an anonymous caller (Render's own health checker included) sees
+# only the bare UP/DOWN status, while a request carrying a valid JWT sees which
+# component failed - useful mid-incident without turning the probe into a public
+# system map.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      # Boot 3.2 only auto-publishes the liveness/readiness groups when it detects a
+      # Kubernetes environment. Render isn't Kubernetes, so this has to be forced on
+      # explicitly rather than relying on that auto-detection.
+      probes:
+        enabled: true
+      show-details: when-authorized
+      group:
+        readiness:
+          # readinessState is Spring's own "can this instance serve traffic" flag.
+          # db is added explicitly - it is not a member of the group by default -
+          # so a Neon outage actually flips /actuator/health/readiness to DOWN
+          # instead of only showing up buried in the (unauthenticated) aggregate
+          # /actuator/health. No R2 indicator here: presigning a PUT URL never
+          # calls R2 over the network (see R2StorageProvider), a real check would
+          # mean polling a third party on every probe, and image-upload failures
+          # already surface per-request as a clean 502 (GlobalExceptionHandler ->
+          # StorageException) without needing the whole instance marked unready -
+          # bookings, browsing, and every other route work fine with R2 down.
+          include: readinessState, db

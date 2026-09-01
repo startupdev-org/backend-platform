@@ -81,6 +81,15 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
 
                         // ── 1. Fully public ───────────────────────────────────────────
+                        // Render's health checker (and any external uptime monitor) hits this
+                        // with no token, so it must be reachable pre-auth. Deliberately NOT
+                        // folded into PUBLIC_GET_PATTERNS below: that array is applied with no
+                        // HttpMethod restriction, so anything added to it is permitAll() for
+                        // every method, not just GET (BP-66). Actuator only exposes "health"
+                        // (application.yml, management.endpoints.web.exposure.include), so this
+                        // is also the entire public /actuator surface - everything else under
+                        // /actuator falls through to .anyRequest().authenticated() below.
+                        .requestMatchers(HttpMethod.GET, "/actuator/health/**").permitAll()
                         .requestMatchers(HttpMethod.POST, PUBLIC_POST_PATTERNS).permitAll()
                         .requestMatchers(PUBLIC_GET_PATTERNS).permitAll()
 

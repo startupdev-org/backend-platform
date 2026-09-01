@@ -1,10 +1,13 @@
 package com.platform.controller;
 
+import com.platform.dto.EmployeeServiceAssignmentRequestDTO;
+import com.platform.dto.EmployeeServiceAssignmentResponseDTO;
 import com.platform.dto.availability.AvailabilityResponseDTO;
 import com.platform.dto.employee.EmployeeRequestDTO;
 import com.platform.dto.employee.EmployeeResponseDTO;
 import com.platform.entity.User;
 import com.platform.service.AvailabilityService;
+import com.platform.service.EmployeeLocationServicePriceService;
 import com.platform.service.EmployeeService;
 import com.platform.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -45,6 +48,10 @@ public class EmployeeController {
 
     private final EmployeeService employeeService;
     private final AvailabilityService availabilityService;
+    // Owns the employee/service/location join rows. The service-assignment route lives on this
+    // path (it is an action on an employee), but the logic stays where the join table's
+    // ownership and cross-tenant validators already are.
+    private final EmployeeLocationServicePriceService priceService;
     private final UserService userService;
 
     @Operation(summary = "List employees",
@@ -172,6 +179,34 @@ public class EmployeeController {
             @Valid @RequestBody EmployeeRequestDTO request) {
         EmployeeResponseDTO employee = employeeService.createEmployee(businessId, request);
         return new ResponseEntity<>(employee, HttpStatus.CREATED);
+    }
+
+    @Operation(summary = "Assign services to an employee at base price",
+            description = "Makes the employee bookable for each of the given services by creating the "
+                    + "employee/service/location price rows the booking flow requires, one per location "
+                    + "of the business, priced from the service's own base price. Idempotent: services "
+                    + "already assigned are reported back untouched - an existing per-employee price "
+                    + "override is never reset to base price - and re-posting is a 200, not a 409. "
+                    + "Prices are not settable here; use the employee-service-price endpoints to override one.")
+    @ApiResponse(responseCode = "200", description = "Assignment applied; body reports what was created "
+            + "and what was already there")
+    @ApiResponse(responseCode = "400", description = "Empty service id list, or the business has no locations yet")
+    @ApiResponse(responseCode = "401", description = "Not authenticated")
+    @ApiResponse(responseCode = "403", description = "Not the business owner, or a service belongs to another business")
+    @ApiResponse(responseCode = "404", description = "Business, employee or service not found")
+    @ApiResponse(responseCode = "409", description = "A concurrent request created the same row first; safe to retry")
+    @SecurityRequirement(name = "bearerAuth")
+    @PostMapping("/{employeeId}/services")
+    public ResponseEntity<EmployeeServiceAssignmentResponseDTO> assignServices(
+            @Parameter(description = "Business UUID")
+            @PathVariable UUID businessId,
+            @Parameter(description = "Employee UUID")
+            @PathVariable UUID employeeId,
+            @Valid @RequestBody EmployeeServiceAssignmentRequestDTO request,
+            Authentication authentication) {
+        User currentUser = userService.getUserByUsername(authentication.getName());
+        return ResponseEntity.ok(
+                priceService.assignServicesAtBasePrice(businessId, employeeId, request, currentUser));
     }
 
     @Operation(summary = "Update an employee",

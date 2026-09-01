@@ -9,6 +9,7 @@ import com.platform.exception.EmailAlreadyRegisteredException;
 import com.platform.exception.InvalidCredentialsException;
 import com.platform.service.AuthService;
 import com.platform.service.PasswordService;
+import com.platform.service.UserService;
 import com.platform.utils.JwtUtils;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,6 +49,11 @@ class AuthControllerTest {
 
     @MockBean
     private PasswordService passwordService;
+
+    // AuthController takes no @CurrentUser parameter, but @WebMvcTest still loads WebMvcConfig ->
+    // CurrentUserArgumentResolver, whose constructor needs a UserService bean (BP-40).
+    @MockBean
+    private UserService userService;
 
     @MockBean
     private JwtUtils jwtUtils;

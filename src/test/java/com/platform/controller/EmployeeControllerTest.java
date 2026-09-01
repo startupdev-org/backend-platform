@@ -106,7 +106,9 @@ class EmployeeControllerTest {
 
     @Test
     void createEmployee_asBusinessAdmin_returns201() throws Exception {
-        when(employeeService.createEmployee(eq(BUSINESS_ID), any(EmployeeRequestDTO.class)))
+        // @CurrentUser resolves via the mocked UserService, so currentUser arrives null here -
+        // any(User.class) would not match it, any() does.
+        when(employeeService.createEmployee(eq(BUSINESS_ID), any(EmployeeRequestDTO.class), any()))
                 .thenReturn(employeeDto());
 
         mvc.perform(post("/api/business/{b}/employee", BUSINESS_ID)

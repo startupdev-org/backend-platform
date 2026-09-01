@@ -57,7 +57,8 @@ public class ServiceController {
         return ResponseEntity.ok(service);
     }
 
-    @Operation(summary = "List all services", description = "Returns paginated services for the specified business")
+    @Operation(summary = "List all services", description = "Returns paginated services for the specified business, "
+            + "optionally narrowed to those whose name or description contain 'q'")
     @ApiResponse(responseCode = "200", description = "Services retrieved successfully")
     @ApiResponse(responseCode = "404", description = "Business not found")
     @GetMapping
@@ -67,13 +68,17 @@ public class ServiceController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @Parameter(description = "Sort as 'field' or 'field,asc|desc'", example = "price,desc")
-            @RequestParam(required = false) String sort) {
-        Page<ServiceResponseDTO> services = providedServicesService.getBusinessServices(businessId,
+            @RequestParam(required = false) String sort,
+            @Parameter(description = "Case-insensitive substring match against the service name or description. "
+                    + "Omitted, blank, or whitespace-only means no filtering.", example = "haircut")
+            @RequestParam(required = false) String q) {
+        Page<ServiceResponseDTO> services = providedServicesService.getBusinessServices(businessId, q,
                 PageRequests.of(page, size, sort, ProvidedServicesService.SORTABLE_FIELDS, ProvidedServicesService.DEFAULT_SORT));
         return ResponseEntity.ok(services);
     }
 
-    @Operation(summary = "List active services", description = "Returns paginated active services for the specified business")
+    @Operation(summary = "List active services", description = "Returns paginated active services for the specified business, "
+            + "optionally narrowed to those whose name or description contain 'q'")
     @ApiResponse(responseCode = "200", description = "Active services retrieved successfully")
     @ApiResponse(responseCode = "404", description = "Business not found")
     @GetMapping("/active")
@@ -83,8 +88,11 @@ public class ServiceController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @Parameter(description = "Sort as 'field' or 'field,asc|desc'", example = "price,desc")
-            @RequestParam(required = false) String sort) {
-        Page<ServiceResponseDTO> services = providedServicesService.getActiveServices(businessId,
+            @RequestParam(required = false) String sort,
+            @Parameter(description = "Case-insensitive substring match against the service name or description. "
+                    + "Omitted, blank, or whitespace-only means no filtering.", example = "haircut")
+            @RequestParam(required = false) String q) {
+        Page<ServiceResponseDTO> services = providedServicesService.getActiveServices(businessId, q,
                 PageRequests.of(page, size, sort, ProvidedServicesService.SORTABLE_FIELDS, ProvidedServicesService.DEFAULT_SORT));
         return ResponseEntity.ok(services);
     }

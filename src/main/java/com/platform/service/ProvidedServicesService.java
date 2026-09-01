@@ -12,10 +12,12 @@ import com.platform.exception.ServiceNotFoundException;
 import com.platform.repository.BookingRepository;
 import com.platform.repository.BusinessRepository;
 import com.platform.repository.ServiceRepository;
+import com.platform.repository.spec.ServiceSpecifications;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -101,14 +103,37 @@ public class ProvidedServicesService {
                 .toList();
     }
 
-    public Page<ServiceResponseDTO> getBusinessServices(UUID businessId, Pageable pageable) {
-        return serviceRepository.findByBusinessId(businessId, pageable)
-                .map(this::toDTO);
+    /**
+     * Paged, business-scoped list. With no {@code q} this hits the exact same query as
+     * before (BP-12) - a blank/null search term is a no-op, not an "empty filter" that
+     * happens to match everything. With a {@code q}, the search composes through
+     * {@link ServiceSpecifications} so the business scope can never be left off; see the
+     * class comment there.
+     */
+    public Page<ServiceResponseDTO> getBusinessServices(UUID businessId, String q, Pageable pageable) {
+        if (isBlank(q)) {
+            return serviceRepository.findByBusinessId(businessId, pageable)
+                    .map(this::toDTO);
+        }
+        Specification<ProvidedService> spec = ServiceSpecifications.belongsToBusiness(businessId)
+                .and(ServiceSpecifications.nameOrDescriptionContains(q));
+        return serviceRepository.findAll(spec, pageable).map(this::toDTO);
     }
 
-    public Page<ServiceResponseDTO> getActiveServices(UUID businessId, Pageable pageable) {
-        return serviceRepository.findByBusinessIdAndActive(businessId, true, pageable)
-                .map(this::toDTO);
+    /** Same as {@link #getBusinessServices(UUID, String, Pageable)}, scoped to active services only. */
+    public Page<ServiceResponseDTO> getActiveServices(UUID businessId, String q, Pageable pageable) {
+        if (isBlank(q)) {
+            return serviceRepository.findByBusinessIdAndActive(businessId, true, pageable)
+                    .map(this::toDTO);
+        }
+        Specification<ProvidedService> spec = ServiceSpecifications.belongsToBusiness(businessId)
+                .and(ServiceSpecifications.isActive(true))
+                .and(ServiceSpecifications.nameOrDescriptionContains(q));
+        return serviceRepository.findAll(spec, pageable).map(this::toDTO);
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     @Transactional

@@ -12,15 +12,24 @@ import com.platform.exception.ServiceNotFoundException;
 import com.platform.repository.BookingRepository;
 import com.platform.repository.BusinessRepository;
 import com.platform.repository.ServiceRepository;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Root;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -36,8 +45,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -265,7 +278,9 @@ class ProvidedServicesServiceTest {
         assertThrows(BusinessException.class, () -> providedServicesService
                 .deleteService(ownedBusiness.getId(), UUID.randomUUID(), stranger));
 
-        verify(serviceRepository, never()).delete(any());
+        // Typed matcher: ServiceRepository now also extends JpaSpecificationExecutor,
+        // which overloads delete(Specification<T>), so a bare any() is ambiguous (BP-12).
+        verify(serviceRepository, never()).delete(any(ProvidedService.class));
         verifyNoInteractions(bookingRepository);
     }
 
@@ -334,6 +349,111 @@ class ProvidedServicesServiceTest {
         assertEquals(Map.of(), providedServicesService.getServicesByBusinessIds(List.of()));
 
         verifyNoInteractions(serviceRepository);
+    }
+
+    // ── BP-12: paged list + q search ────────────────────────────────────────────
+
+    @Test
+    void getBusinessServices_blankQ_takesTheNoFilterPathAndPreservesPaging() {
+        Pageable pageable = PageRequest.of(0, 10);
+        when(serviceRepository.findByBusinessId(ownedBusiness.getId(), pageable))
+                .thenReturn(new PageImpl<>(List.of(service(ownedBusiness, "Cut", true))));
+
+        Page<ServiceResponseDTO> page =
+                providedServicesService.getBusinessServices(ownedBusiness.getId(), "   ", pageable);
+
+        assertEquals(1, page.getContent().size());
+        verify(serviceRepository).findByBusinessId(ownedBusiness.getId(), pageable);
+        verify(serviceRepository, never())
+                .findAll(ArgumentMatchers.<Specification<ProvidedService>>any(), any(Pageable.class));
+    }
+
+    @Test
+    void getBusinessServices_nullQ_takesTheNoFilterPath() {
+        Pageable pageable = PageRequest.of(0, 10);
+        when(serviceRepository.findByBusinessId(ownedBusiness.getId(), pageable))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        providedServicesService.getBusinessServices(ownedBusiness.getId(), null, pageable);
+
+        verify(serviceRepository).findByBusinessId(ownedBusiness.getId(), pageable);
+        verify(serviceRepository, never())
+                .findAll(ArgumentMatchers.<Specification<ProvidedService>>any(), any(Pageable.class));
+    }
+
+    @Test
+    void getBusinessServices_presentQ_takesTheFilteredPathAndScopesToTheBusiness() {
+        Pageable pageable = PageRequest.of(0, 10);
+        when(serviceRepository.findAll(ArgumentMatchers.<Specification<ProvidedService>>any(), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of(service(ownedBusiness, "Haircut", true))));
+
+        Page<ServiceResponseDTO> page =
+                providedServicesService.getBusinessServices(ownedBusiness.getId(), "cut", pageable);
+
+        assertEquals(1, page.getContent().size());
+        verify(serviceRepository, never()).findByBusinessId(any(UUID.class), any(Pageable.class));
+
+        CriteriaBuilder cb = evaluateCapturedSpecification();
+        // belongsToBusiness
+        verify(cb).equal(any(), eq(ownedBusiness.getId()));
+        // nameOrDescriptionContains
+        verify(cb, times(2)).like(any(), anyString(), eq('\\'));
+        verify(cb).or(any(), any());
+    }
+
+    @Test
+    void getActiveServices_blankQ_takesTheNoFilterPathAndKeepsTheActiveConstraint() {
+        Pageable pageable = PageRequest.of(0, 10);
+        when(serviceRepository.findByBusinessIdAndActive(ownedBusiness.getId(), true, pageable))
+                .thenReturn(new PageImpl<>(List.of(service(ownedBusiness, "Cut", true))));
+
+        Page<ServiceResponseDTO> page =
+                providedServicesService.getActiveServices(ownedBusiness.getId(), null, pageable);
+
+        assertEquals(1, page.getContent().size());
+        verify(serviceRepository).findByBusinessIdAndActive(ownedBusiness.getId(), true, pageable);
+        verify(serviceRepository, never())
+                .findAll(ArgumentMatchers.<Specification<ProvidedService>>any(), any(Pageable.class));
+    }
+
+    @Test
+    void getActiveServices_presentQ_takesTheFilteredPathAndKeepsTheActiveConstraint() {
+        Pageable pageable = PageRequest.of(0, 10);
+        when(serviceRepository.findAll(ArgumentMatchers.<Specification<ProvidedService>>any(), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of(service(ownedBusiness, "Haircut", true))));
+
+        providedServicesService.getActiveServices(ownedBusiness.getId(), "cut", pageable);
+
+        verify(serviceRepository, never())
+                .findByBusinessIdAndActive(any(UUID.class), any(Boolean.class), any(Pageable.class));
+
+        CriteriaBuilder cb = evaluateCapturedSpecification();
+        // belongsToBusiness and isActive(true) each resolve to a distinct equal(Expression, Object)
+        // overload call; verifying them separately (rather than equal(any(), any()) twice) avoids
+        // the two equal(...) overloads on CriteriaBuilder resolving to different mocked methods.
+        verify(cb).equal(any(), eq(ownedBusiness.getId()));
+        verify(cb).equal(any(), eq(true));
+        // nameOrDescriptionContains
+        verify(cb, times(2)).like(any(), anyString(), eq('\\'));
+        verify(cb).or(any(), any());
+    }
+
+    /**
+     * Pulls the Specification the service handed the repository and runs it against
+     * mocks, so the returned CriteriaBuilder records which predicates were built.
+     * Mirrors {@code BusinessServiceTest.evaluateCapturedSpecification}.
+     */
+    @SuppressWarnings("unchecked")
+    private CriteriaBuilder evaluateCapturedSpecification() {
+        ArgumentCaptor<Specification<ProvidedService>> captor = ArgumentCaptor.forClass(Specification.class);
+        verify(serviceRepository).findAll(captor.capture(), any(Pageable.class));
+
+        Root<ProvidedService> root = mock(Root.class, RETURNS_DEEP_STUBS);
+        CriteriaQuery<?> query = mock(CriteriaQuery.class);
+        CriteriaBuilder cb = mock(CriteriaBuilder.class, RETURNS_DEEP_STUBS);
+
+        captor.getValue().toPredicate(root, (CriteriaQuery<?>) query, cb);
+        return cb;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

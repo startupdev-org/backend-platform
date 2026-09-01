@@ -18,7 +18,10 @@ public class AppConfig {
     @Value("${spring.application.name}") // Injects 'spring.application.name' property
     private String appName;
 
-    @Value("${spring.profiles.active}")
+    // Defaulted, like application.yml's own SPRING_PROFILES_ACTIVE placeholder. Without
+    // it this bean is a second, independent reason a context with no profile set fails
+    // to start - and it fails at bean creation, well away from the config that caused it.
+    @Value("${spring.profiles.active:dev}")
     private String appProfileActive;
 
 

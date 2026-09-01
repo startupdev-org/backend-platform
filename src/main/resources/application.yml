@@ -3,7 +3,11 @@ spring:
     name: service-platform
 
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE}
+    # Defaulted to dev, which is what CLAUDE.md has always claimed. Without the
+    # default an unset SPRING_PROFILES_ACTIVE is an unresolvable placeholder and the
+    # app refuses to start, so a fresh clone could not follow the documented setup.
+    # Both Render services set the variable explicitly, so neither one relies on this.
+    active: ${SPRING_PROFILES_ACTIVE:dev}
 
   # Local development only: a gitignored file next to this one.
   # Deployed environments supply the same keys as real environment variables.

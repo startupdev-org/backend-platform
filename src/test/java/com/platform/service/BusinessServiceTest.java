@@ -86,6 +86,23 @@ class BusinessServiceTest {
         SecurityContextHolder.clearContext();
     }
 
+    // BP-54 audit: Business.workingHours and Business.features both carry a field
+    // initializer (new ArrayList<>() / new HashSet<>()) under @Builder with no
+    // @Builder.Default, the same silent-drop pattern the ticket fixed on
+    // Location.isDefaultLocation. Neither collection is a real DB column - they're the
+    // mappedBy side of a @OneToMany - so nothing currently NPEs on a live code path, but a
+    // Business.builder()...build() used to hand back null collections rather than the
+    // empty ones the field declarations promise.
+    @Test
+    void builderDefaults_workingHoursAndFeatures_areEmptyNotNull() {
+        Business business = Business.builder().build();
+
+        assertNotNull(business.getWorkingHours());
+        assertTrue(business.getWorkingHours().isEmpty());
+        assertNotNull(business.getFeatures());
+        assertTrue(business.getFeatures().isEmpty());
+    }
+
     // ----------------------------
     // Helpers
     // ----------------------------

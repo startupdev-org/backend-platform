@@ -1,0 +1,44 @@
+# Docker build context excludes.
+#
+# CI runs `mvn -B verify` before `docker build`, so target/ now exists in the
+# context. Everything in it is excluded except the one jar the `prebuilt` stage
+# copies — otherwise classes/, test-classes/, surefire-reports/ and app.jar.original
+# would all be uploaded to the builder and would bust the layer cache every run.
+# The `build` stage is unaffected: it only needs pom.xml and src/.
+target/*
+!target/app.jar
+
+# VCS, CI and agent metadata. Not needed to compile or run, and .git in particular
+# changes on every commit, which would invalidate the context on every build.
+.git
+.gitignore
+.github
+.claude
+.bolt
+.idea
+*.iml
+qodana.yaml
+
+# Docs and DB scratch files. The migrations Flyway actually runs are under
+# src/main/resources/db/migration and stay in the context.
+docs
+database
+README.md
+SETUP.md
+CLAUDE.md
+
+# Stray Node bits at the repo root; this is a Maven project.
+node_modules
+package.json
+package-lock.json
+index.js
+
+# Local secrets must never end up in an image layer. Both imports in
+# application.yml are `optional:`, so their absence is fine at build time —
+# Render supplies these as env vars and /etc/secrets mounts at runtime.
+src/main/resources/secrets.properties
+.env
+
+# Docker's own files are read by the client, not needed in the context.
+Dockerfile
+.dockerignore

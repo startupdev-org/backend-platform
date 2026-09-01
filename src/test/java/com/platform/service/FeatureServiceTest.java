@@ -5,6 +5,7 @@ import com.platform.entity.Business;
 import com.platform.entity.BusinessFeature;
 import com.platform.entity.User;
 import com.platform.exception.BadRequestException;
+import com.platform.exception.BusinessFeatureAlreadyExistsException;
 import com.platform.exception.BusinessOwnershipException;
 import com.platform.exception.ResourceNotFoundException;
 import com.platform.repository.BusinessFeatureRepository;
@@ -100,6 +101,28 @@ class FeatureServiceTest {
 
         assertEquals(business.getId(), response.getBusinessId());
         verify(featureRepository).save(any(BusinessFeature.class));
+    }
+
+    // BP-54: BusinessFeature.name is unique per business, not platform-wide (see
+    // V10__scope_business_feature_name_uniqueness.sql), but a duplicate within the SAME
+    // business must still be rejected - via this pre-check, not the raw
+    // DataIntegrityViolationException the removed column-level unique constraint used to
+    // produce. The cross-business case (two different businesses both using "Wi-Fi") is a
+    // schema fact this Mockito-only test cannot exercise - only a real database can prove
+    // that a second business's insert no longer collides with the first.
+    @Test
+    void addFeature_duplicateWithinSameBusiness_throwsAlreadyExists() {
+        User owner = enabledUser();
+        Business business = business(owner);
+
+        when(userService.getUser()).thenReturn(owner);
+        when(businessRepository.findById(business.getId())).thenReturn(Optional.of(business));
+        when(featureRepository.existsByBusinessIdAndName(business.getId(), "Wi-Fi")).thenReturn(true);
+
+        assertThrows(BusinessFeatureAlreadyExistsException.class,
+                () -> featureService.addFeature(business.getId(), BusinessFeatureDTO.builder().name("Wi-Fi").build()));
+
+        verify(featureRepository, never()).save(any());
     }
 
     // ==================== removeFeature ====================

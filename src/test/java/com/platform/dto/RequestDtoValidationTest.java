@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -112,6 +114,36 @@ class RequestDtoValidationTest {
                 UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), new BigDecimal("0.00"));
 
         assertTrue(validator.validate(dto).isEmpty());
+    }
+
+    // ==================== EmployeeServiceAssignmentRequestDTO ====================
+
+    @Test
+    void serviceAssignment_nullList_rejected() {
+        assertEquals(Set.of("serviceIds"),
+                violatedFields(new EmployeeServiceAssignmentRequestDTO(null)));
+    }
+
+    @Test
+    void serviceAssignment_emptyList_rejected() {
+        // An empty list would otherwise be an expensive way to do nothing at all.
+        assertEquals(Set.of("serviceIds"),
+                violatedFields(new EmployeeServiceAssignmentRequestDTO(List.of())));
+    }
+
+    @Test
+    void serviceAssignment_nullElement_rejected() {
+        List<UUID> ids = new ArrayList<>();
+        ids.add(UUID.randomUUID());
+        ids.add(null);
+
+        assertFalse(validator.validate(new EmployeeServiceAssignmentRequestDTO(ids)).isEmpty());
+    }
+
+    @Test
+    void serviceAssignment_oneId_passes() {
+        assertTrue(validator.validate(
+                new EmployeeServiceAssignmentRequestDTO(List.of(UUID.randomUUID()))).isEmpty());
     }
 
     // ==================== BusinessFeatureDTO ====================

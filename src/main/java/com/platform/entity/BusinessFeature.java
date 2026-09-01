@@ -22,6 +22,10 @@ public class BusinessFeature {
     @JoinColumn(name = "business_id", nullable = false)
     private Business business;
 
-    @Column(nullable = false, unique = true)
+    // Unique per business, not platform-wide - enforced by the composite
+    // uniqueConstraints above, not here. A column-level `unique = true` on name alone
+    // used to let the first business to add "WiFi" claim that name for every business
+    // on the platform forever. See V10__scope_business_feature_name_uniqueness.sql.
+    @Column(nullable = false)
     private String name;
 }

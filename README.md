@@ -260,15 +260,21 @@ Database migrations use Hibernate's `ddl-auto` in dev mode. For production, use 
 
 ### Building for Production
 ```bash
-mvn clean package -DskipTests -Pproduction
+mvn clean package -DskipTests
 ```
+Produces `target/app.jar` — the name is fixed by `<finalName>app</finalName>` in the pom, so it does not move when the project version changes.
 
 ### Docker Deployment
-```dockerfile
-FROM openjdk:17-jdk-slim
-COPY target/beauty-booking-platform-1.0.0.jar app.jar
-ENTRYPOINT ["java", "-jar", "app.jar"]
+The repository root holds a multi-stage `Dockerfile` (Maven build → `eclipse-temurin:17-jre-jammy`, non-root `app` user). It is self-contained, so a clean checkout needs no prior Maven run:
+```bash
+docker build -t backend-platform .
 ```
+If you have already run `mvn package`, pass the build arg CI uses and the image will copy that jar instead of compiling a second time:
+```bash
+mvn -B package
+docker build --build-arg JAR_SOURCE=prebuilt -t backend-platform .
+```
+Requires BuildKit, which is the default in Docker 23+.
 
 ### Environment Variables for Production
 Set environment variables for your production database:

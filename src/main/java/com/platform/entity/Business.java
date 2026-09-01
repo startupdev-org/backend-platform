@@ -72,6 +72,11 @@ public class Business {
     @OneToMany(mappedBy = "business")
     private List<Location> locations;
 
+    // @Builder.Default: same silent-drop pattern BP-54 fixed on Location.isDefaultLocation
+    // and V2 fixed on User.isEnabled. Not a DB column (mappedBy side of the association),
+    // so there is no NOT NULL to violate, but a Business.builder()...build() without it
+    // NPEs the moment anything calls .getWorkingHours() before the entity is reloaded.
+    @Builder.Default
     @OneToMany(
             mappedBy = "business",
             cascade = CascadeType.ALL,
@@ -88,6 +93,8 @@ public class Business {
     @OneToMany(mappedBy = "business", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProvidedService> providedServices;
 
+    // Same reasoning as workingHours above.
+    @Builder.Default
     @OneToMany(mappedBy = "business", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<BusinessFeature> features = new HashSet<>();
 

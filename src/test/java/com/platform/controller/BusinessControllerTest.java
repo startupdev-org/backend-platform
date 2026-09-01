@@ -102,7 +102,9 @@ class BusinessControllerTest {
 
     @Test
     void createBusiness_asBusinessAdmin_returns201() throws Exception {
-        when(businessService.createBusiness(any(BusinessRequestDTO.class))).thenReturn(businessDto());
+        // @CurrentUser resolves via the mocked UserService, so currentUser arrives null here -
+        // any(User.class) would not match it, any() does.
+        when(businessService.createBusiness(any(BusinessRequestDTO.class), any())).thenReturn(businessDto());
 
         mvc.perform(post("/api/business")
                         .with(user("owner@example.com").roles("BUSINESS_ADMIN"))

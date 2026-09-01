@@ -28,7 +28,9 @@ BEGIN
        AND rel.relname = 'business_features'
        AND nsp.nspname = current_schema()
        AND (
-           SELECT array_agg(att.attname ORDER BY att.attname)
+           -- att.attname is Postgres's `name` type; cast to text so the comparison
+           -- resolves against the text[] literal on the right (no name[] = text[] operator).
+           SELECT array_agg(att.attname::text ORDER BY att.attname::text)
              FROM unnest(con.conkey) AS colnum
              JOIN pg_attribute att
                ON att.attrelid = con.conrelid AND att.attnum = colnum
@@ -55,7 +57,7 @@ BEGIN
            AND rel.relname = 'business_features'
            AND nsp.nspname = current_schema()
            AND (
-               SELECT array_agg(att.attname ORDER BY att.attname)
+               SELECT array_agg(att.attname::text ORDER BY att.attname::text)
                  FROM unnest(con.conkey) AS colnum
                  JOIN pg_attribute att
                    ON att.attrelid = con.conrelid AND att.attnum = colnum

@@ -36,16 +36,16 @@ spring:
     # baseline-on-migrate: true (application.yml) exists for the two pre-Flyway Neon
     # databases - it only changes behaviour when Flyway finds a non-empty schema with
     # no history table, which never happens here, so it is a no-op either way on a
-    # fresh container. Set to false anyway: this suite's whole point is proving V1..V9
-    # apply cleanly to nothing, and false makes it fail loudly instead of silently
-    # baselining if a container ever surprises us with pre-existing tables.
+    # fresh container. Set to false anyway: this suite's whole point is proving the
+    # migrations apply cleanly to nothing, and false makes it fail loudly instead of
+    # silently baselining if a container ever surprises us with pre-existing tables.
     baseline-on-migrate: false
 
   jpa:
     show-sql: false
     # hibernate.ddl-auto: validate is inherited from application.yml and deliberately
     # NOT overridden here - it is the assertion this whole ticket exists to run: that
-    # the entities and the 9 migrations agree, in CI, before a deploy.
+    # the entities and the migrations agree, in CI, before a deploy.
 
 logging:
   level:

@@ -5,7 +5,6 @@ import com.platform.dto.location.LocationResponseDTO;
 import com.platform.dto.service.ServiceResponseDTO;
 import com.platform.dto.user.UserResponseDTO;
 import com.platform.entity.Employee;
-import com.platform.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -40,9 +39,4 @@ public class BusinessResponseDTO {
     private List<BusinessWorkingHoursDTO> businessWorkingHours;
     private Set<BusinessFeatureDTO> businessFeatures;
     private List<LocationResponseDTO> locationList;
-
-
-    public boolean isNotOwner(User userToCheck) {
-        return !owner.getId().equals(userToCheck.getId());
-    }
 }

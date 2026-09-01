@@ -4,8 +4,8 @@ import com.platform.dto.booking.BookingRequestDTO;
 import com.platform.dto.booking.BookingResponseDTO;
 import com.platform.entity.Booking;
 import com.platform.entity.User;
+import com.platform.security.CurrentUser;
 import com.platform.service.BookingService;
-import com.platform.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -16,7 +16,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -41,7 +40,6 @@ import java.util.UUID;
 public class BookingController {
 
     private final BookingService bookingService;
-    private final UserService userService;
 
     @Operation(summary = "Create a booking",
             description = "Books a service with an employee at a given time. Public - a customer "
@@ -70,8 +68,8 @@ public class BookingController {
     public ResponseEntity<BookingResponseDTO> getBooking(
             @Parameter(description = "Booking UUID", example = "123e4567-e89b-12d3-a456-426614174000")
             @PathVariable UUID id,
-            Authentication authentication) {
-        BookingResponseDTO booking = bookingService.getBooking(id, currentUser(authentication));
+            @CurrentUser User currentUser) {
+        BookingResponseDTO booking = bookingService.getBooking(id, currentUser);
         return ResponseEntity.ok(booking);
     }
 
@@ -90,9 +88,9 @@ public class BookingController {
             @RequestParam(required = false) UUID employeeId,
             @Parameter(description = "Only bookings in this status", example = "CONFIRMED")
             @RequestParam(required = false) Booking.BookingStatus status,
-            Authentication authentication) {
+            @CurrentUser User currentUser) {
         List<BookingResponseDTO> bookings =
-                bookingService.listBookings(employeeId, status, currentUser(authentication));
+                bookingService.listBookings(employeeId, status, currentUser);
         return ResponseEntity.ok(bookings);
     }
 
@@ -112,9 +110,9 @@ public class BookingController {
             @RequestParam LocalDateTime startDate,
             @Parameter(description = "Range end, as ISO-8601 date-time", example = "2026-09-30T23:59:59")
             @RequestParam LocalDateTime endDate,
-            Authentication authentication) {
+            @CurrentUser User currentUser) {
         List<BookingResponseDTO> bookings = bookingService.getEmployeeBookings(
-                employeeId, startDate, endDate, currentUser(authentication));
+                employeeId, startDate, endDate, currentUser);
         return ResponseEntity.ok(bookings);
     }
 
@@ -132,9 +130,9 @@ public class BookingController {
             @PathVariable UUID id,
             @Parameter(description = "New status", example = "CONFIRMED")
             @RequestParam Booking.BookingStatus status,
-            Authentication authentication) {
+            @CurrentUser User currentUser) {
         BookingResponseDTO booking =
-                bookingService.updateBookingStatus(id, status, currentUser(authentication));
+                bookingService.updateBookingStatus(id, status, currentUser);
         return ResponseEntity.ok(booking);
     }
 
@@ -150,8 +148,8 @@ public class BookingController {
     public ResponseEntity<Void> cancelBooking(
             @Parameter(description = "Booking UUID")
             @PathVariable UUID id,
-            Authentication authentication) {
-        bookingService.cancelBooking(id, currentUser(authentication));
+            @CurrentUser User currentUser) {
+        bookingService.cancelBooking(id, currentUser);
         return ResponseEntity.noContent().build();
     }
 
@@ -169,13 +167,9 @@ public class BookingController {
             @PathVariable UUID businessId,
             @Parameter(description = "Status to filter by", example = "PENDING")
             @RequestParam Booking.BookingStatus status,
-            Authentication authentication) {
+            @CurrentUser User currentUser) {
         List<BookingResponseDTO> bookings =
-                bookingService.getBusinessBookings(businessId, status, currentUser(authentication));
+                bookingService.getBusinessBookings(businessId, status, currentUser);
         return ResponseEntity.ok(bookings);
-    }
-
-    private User currentUser(Authentication authentication) {
-        return userService.getUserByUsername(authentication.getName());
     }
 }

@@ -1,6 +1,8 @@
 package com.platform.controller;
 
 import com.platform.dto.business.BusinessFeatureDTO;
+import com.platform.entity.User;
+import com.platform.security.CurrentUser;
 import com.platform.service.FeatureService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -48,8 +50,9 @@ public class BusinessFeatureController {
     public ResponseEntity<BusinessFeatureDTO> addFeature(
             @Parameter(description = "Business UUID")
             @PathVariable UUID businessId,
-            @Valid @RequestBody BusinessFeatureDTO request) {
-        return ResponseEntity.ok(featureService.addFeature(businessId, request));
+            @Valid @RequestBody BusinessFeatureDTO request,
+            @CurrentUser User currentUser) {
+        return ResponseEntity.ok(featureService.addFeature(businessId, request, currentUser));
     }
 
     @Operation(summary = "Remove a feature",
@@ -63,8 +66,9 @@ public class BusinessFeatureController {
             @Parameter(description = "Business UUID")
             @PathVariable UUID businessId,
             @Parameter(description = "Feature ID", example = "1")
-            @PathVariable Long featureId) {
-        featureService.removeFeature(businessId, featureId);
+            @PathVariable Long featureId,
+            @CurrentUser User currentUser) {
+        featureService.removeFeature(businessId, featureId, currentUser);
         return ResponseEntity.noContent().build();
     }
 }

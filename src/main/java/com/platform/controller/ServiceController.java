@@ -3,8 +3,8 @@ package com.platform.controller;
 import com.platform.dto.service.ServiceRequestDTO;
 import com.platform.dto.service.ServiceResponseDTO;
 import com.platform.entity.User;
+import com.platform.security.CurrentUser;
 import com.platform.service.ProvidedServicesService;
-import com.platform.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -16,7 +16,6 @@ import org.springframework.data.domain.Page;
 import com.platform.utils.PageRequests;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -30,7 +29,6 @@ import java.util.UUID;
 public class ServiceController {
 
     private final ProvidedServicesService providedServicesService;
-    private final UserService userService;
 
     @Operation(summary = "Create a service", description = "Creates a new service for the specified business")
     @ApiResponse(responseCode = "201", description = "Service created successfully")
@@ -41,8 +39,9 @@ public class ServiceController {
     public ResponseEntity<ServiceResponseDTO> createService(
             @Parameter(description = "Business UUID", example = "123e4567-e89b-12d3-a456-426614174000")
             @PathVariable UUID businessId,
-            @Valid @RequestBody ServiceRequestDTO request) {
-        ServiceResponseDTO service = providedServicesService.createService(businessId, request);
+            @Valid @RequestBody ServiceRequestDTO request,
+            @CurrentUser User currentUser) {
+        ServiceResponseDTO service = providedServicesService.createService(businessId, request, currentUser);
         return new ResponseEntity<>(service, HttpStatus.CREATED);
     }
 
@@ -108,8 +107,9 @@ public class ServiceController {
             @PathVariable UUID businessId,
             @Parameter(description = "Service UUID", example = "123e4567-e89b-12d3-a456-426614174000")
             @PathVariable UUID serviceId,
-            @Valid @RequestBody ServiceRequestDTO request) {
-        ServiceResponseDTO service = providedServicesService.updateService(businessId, serviceId, request);
+            @Valid @RequestBody ServiceRequestDTO request,
+            @CurrentUser User currentUser) {
+        ServiceResponseDTO service = providedServicesService.updateService(businessId, serviceId, request, currentUser);
         return ResponseEntity.ok(service);
     }
 
@@ -123,8 +123,7 @@ public class ServiceController {
             @PathVariable UUID businessId,
             @Parameter(description = "Service UUID", example = "123e4567-e89b-12d3-a456-426614174000")
             @PathVariable UUID serviceId,
-            Authentication authentication) {
-        User currentUser = userService.getUserByUsername(authentication.getName());
+            @CurrentUser User currentUser) {
         providedServicesService.deleteService(businessId, serviceId, currentUser);
         return ResponseEntity.noContent().build();
     }

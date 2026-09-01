@@ -3,8 +3,8 @@ package com.platform.controller;
 import com.platform.dto.review.ReviewRequestDTO;
 import com.platform.dto.review.ReviewResponseDTO;
 import com.platform.entity.User;
+import com.platform.security.CurrentUser;
 import com.platform.service.ReviewService;
-import com.platform.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -15,7 +15,6 @@ import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,7 +30,6 @@ import java.util.UUID;
 public class ReviewController {
 
     private final ReviewService reviewService;
-    private final UserService userService;
 
     @Operation(summary = "Create a review",
             description = "Adds a review to a booking. Only a COMPLETED booking can be reviewed, "
@@ -88,8 +86,7 @@ public class ReviewController {
             @PathVariable UUID id,
             @Parameter(description = "Reply text, at most 1000 characters")
             @RequestParam @Size(max = 1000, message = "Reply must not exceed 1000 characters") String reply,
-            Authentication authentication) {
-        User currentUser = userService.getUserByUsername(authentication.getName());
+            @CurrentUser User currentUser) {
         ReviewResponseDTO review = reviewService.addBusinessReply(id, reply, currentUser);
         return ResponseEntity.ok(review);
     }

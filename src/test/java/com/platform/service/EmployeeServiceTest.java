@@ -85,9 +85,6 @@ class EmployeeServiceTest {
         when(businessRepository.findById(business.getId()))
                 .thenReturn(Optional.of(business));
 
-        when(userService.getUserByUsername(TEST_EMAIL))
-                .thenReturn(owner);
-
         when(employeeRepository.save(any()))
                 .thenAnswer(i -> {
                     Employee e = i.getArgument(0);
@@ -97,7 +94,7 @@ class EmployeeServiceTest {
                     return e;
                 });
 
-        EmployeeResponseDTO response = employeeService.createEmployee(business.getId(), request);
+        EmployeeResponseDTO response = employeeService.createEmployee(business.getId(), request, owner);
 
         assertNotNull(response);
         assertEquals(request.getFirstName(), response.getFirstName());
@@ -119,7 +116,7 @@ class EmployeeServiceTest {
                 .thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class,
-                () -> employeeService.createEmployee(businessId, request));
+                () -> employeeService.createEmployee(businessId, request, createBusinessOwner()));
 
         verify(employeeRepository, never()).save(any());
     }
@@ -134,11 +131,8 @@ class EmployeeServiceTest {
         when(businessRepository.findById(business.getId()))
                 .thenReturn(Optional.of(business));
 
-        when(userService.getUserByUsername(TEST_EMAIL))
-                .thenReturn(otherUser);
-
         assertThrows(BusinessException.class,
-                () -> employeeService.createEmployee(business.getId(), request));
+                () -> employeeService.createEmployee(business.getId(), request, otherUser));
 
         verify(employeeRepository, never()).save(any());
     }

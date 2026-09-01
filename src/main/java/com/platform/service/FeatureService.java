@@ -6,11 +6,11 @@ import com.platform.entity.BusinessFeature;
 import com.platform.entity.User;
 import com.platform.exception.BadRequestException;
 import com.platform.exception.BusinessFeatureAlreadyExistsException;
-import com.platform.exception.BusinessOwnershipException;
 import com.platform.exception.ResourceNotFoundException;
 import com.platform.exception.UserNotEnabledException;
 import com.platform.repository.BusinessFeatureRepository;
 import com.platform.repository.BusinessRepository;
+import com.platform.utils.BusinessOwnershipValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,7 +24,6 @@ public class FeatureService {
 
     private final BusinessFeatureRepository featureRepository;
     private final BusinessRepository businessRepository;
-    private final UserService userService;
 
     public Set<BusinessFeatureDTO> getAllFeatures(UUID businessId) {
         Business business = getBusinessById(businessId);
@@ -62,11 +61,13 @@ public class FeatureService {
      * <p>The path variable is the authority for which business is written to. The
      * request body used to decide that instead, which let the URL and the effect
      * disagree and made the SecurityConfig matcher for this path meaningless.
+     *
+     * <p>Ownership is checked via {@link BusinessOwnershipValidator}, same as every
+     * other mutating path, which also lets a PLATFORM_ADMIN add a feature to a
+     * business they do not own - this used to be owner-only (BP-40).
      */
     @Transactional
-    public BusinessFeatureDTO addFeature(UUID businessId, BusinessFeatureDTO request) {
-        User user = userService.getUser();
-
+    public BusinessFeatureDTO addFeature(UUID businessId, BusinessFeatureDTO request, User user) {
         if (!user.isEnabled())
             throw new UserNotEnabledException("User is not enabled");
 
@@ -76,9 +77,7 @@ public class FeatureService {
 
         Business business = getBusinessById(businessId);
 
-        if (business.isNotOwner(user)) {
-            throw new BusinessOwnershipException("Cannot add a new feature to a business you do not own");
-        }
+        BusinessOwnershipValidator.assertOwner(business, user);
 
         if(featureRepository.existsByBusinessIdAndName(businessId, request.getName())) {
             throw new BusinessFeatureAlreadyExistsException(
@@ -108,16 +107,16 @@ public class FeatureService {
      * to verify only that the feature belonged to the business named in the path, so
      * any BUSINESS_ADMIN could delete any other business's features. A feature that
      * belongs to a different business is reported as not found, not forbidden.
+     *
+     * <p>Ownership is checked via {@link BusinessOwnershipValidator}, which also lets
+     * a PLATFORM_ADMIN remove a feature from a business they do not own - this used
+     * to be owner-only (BP-40).
      */
     @Transactional
-    public void removeFeature(UUID businessId, Long featureId) {
-        User user = userService.getUser();
-
+    public void removeFeature(UUID businessId, Long featureId, User user) {
         Business business = getBusinessById(businessId);
 
-        if (business.isNotOwner(user)) {
-            throw new BusinessOwnershipException("Cannot remove a feature from a business you do not own");
-        }
+        BusinessOwnershipValidator.assertOwner(business, user);
 
         BusinessFeature feature = getFeatureById(featureId);
 

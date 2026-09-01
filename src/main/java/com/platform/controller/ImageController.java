@@ -6,8 +6,8 @@ import com.platform.dto.image.AttachImageRequestDTO;
 import com.platform.dto.image.UploadUrlRequestDTO;
 import com.platform.dto.image.UploadUrlResponseDTO;
 import com.platform.entity.User;
+import com.platform.security.CurrentUser;
 import com.platform.service.ImageService;
-import com.platform.service.UserService;
 import com.platform.storage.ImageTarget;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -17,7 +17,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -34,7 +33,6 @@ import java.util.UUID;
 public class ImageController {
 
     private final ImageService imageService;
-    private final UserService userService;
 
     // ── Business logo / cover ─────────────────────────────────────────────────
 
@@ -47,8 +45,7 @@ public class ImageController {
             @PathVariable UUID businessId,
             @RequestParam ImageTarget target,
             @Valid @RequestBody UploadUrlRequestDTO request,
-            Authentication authentication) {
-        User currentUser = currentUser(authentication);
+            @CurrentUser User currentUser) {
         return ResponseEntity.ok(imageService.createBusinessUploadUrl(
                 businessId, target, request.getContentType(), currentUser));
     }
@@ -63,8 +60,7 @@ public class ImageController {
             @Parameter(description = "Target scope of the image", example = "LOGO / COVER")
             @RequestParam ImageTarget target,
             @Valid @RequestBody AttachImageRequestDTO request,
-            Authentication authentication) {
-        User currentUser = currentUser(authentication);
+            @CurrentUser User currentUser) {
         return ResponseEntity.ok(imageService.
                 attachBusinessImage(businessId, target, request.getStorageKey(), currentUser));
     }
@@ -74,8 +70,7 @@ public class ImageController {
     public ResponseEntity<BusinessResponseDTO> clearBusinessImage(
             @PathVariable UUID businessId,
             @RequestParam ImageTarget target,
-            Authentication authentication) {
-        User currentUser = currentUser(authentication);
+            @CurrentUser User currentUser) {
         return ResponseEntity.ok(imageService.clearBusinessImage(businessId, target, currentUser));
     }
 
@@ -87,8 +82,7 @@ public class ImageController {
             @PathVariable UUID businessId,
             @PathVariable UUID employeeId,
             @Valid @RequestBody UploadUrlRequestDTO request,
-            Authentication authentication) {
-        User currentUser = currentUser(authentication);
+            @CurrentUser User currentUser) {
         return ResponseEntity.ok(imageService.createEmployeePhotoUploadUrl(
                 businessId, employeeId, request.getContentType(), currentUser));
     }
@@ -99,8 +93,7 @@ public class ImageController {
             @PathVariable UUID businessId,
             @PathVariable UUID employeeId,
             @Valid @RequestBody AttachImageRequestDTO request,
-            Authentication authentication) {
-        User currentUser = currentUser(authentication);
+            @CurrentUser User currentUser) {
         return ResponseEntity.ok(imageService.attachEmployeePhoto(
                 businessId, employeeId, request.getStorageKey(), currentUser));
     }
@@ -110,12 +103,7 @@ public class ImageController {
     public ResponseEntity<EmployeeResponseDTO> clearEmployeePhoto(
             @PathVariable UUID businessId,
             @PathVariable UUID employeeId,
-            Authentication authentication) {
-        User currentUser = currentUser(authentication);
+            @CurrentUser User currentUser) {
         return ResponseEntity.ok(imageService.clearEmployeePhoto(businessId, employeeId, currentUser));
-    }
-
-    private User currentUser(Authentication authentication) {
-        return userService.getUserByUsername(authentication.getName());
     }
 }

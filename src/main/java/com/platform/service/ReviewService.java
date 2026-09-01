@@ -3,12 +3,14 @@ package com.platform.service;
 import com.platform.dto.review.ReviewRequestDTO;
 import com.platform.dto.review.ReviewResponseDTO;
 import com.platform.entity.Booking;
+import com.platform.entity.Business;
 import com.platform.entity.Review;
 import com.platform.entity.User;
 import com.platform.exception.BusinessException;
 import com.platform.exception.ResourceNotFoundException;
 import com.platform.repository.BookingRepository;
 import com.platform.repository.ReviewRepository;
+import com.platform.utils.BusinessOwnershipValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,10 +70,8 @@ public class ReviewService {
         Review review = reviewRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Review not found"));
 
-        if (!review.getBooking().getEmployee().getBusiness().getOwner().getId().equals(currentUser.getId()) &&
-            !currentUser.getRole().equals(User.UserRole.PLATFORM_ADMIN)) {
-            throw new BusinessException("Unauthorized");
-        }
+        Business business = review.getBooking().getEmployee().getBusiness();
+        BusinessOwnershipValidator.assertOwner(business, currentUser);
 
         review.setBusinessReply(reply);
         review = reviewRepository.save(review);

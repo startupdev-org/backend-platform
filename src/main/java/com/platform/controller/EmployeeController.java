@@ -6,10 +6,10 @@ import com.platform.dto.availability.AvailabilityResponseDTO;
 import com.platform.dto.employee.EmployeeRequestDTO;
 import com.platform.dto.employee.EmployeeResponseDTO;
 import com.platform.entity.User;
+import com.platform.security.CurrentUser;
 import com.platform.service.AvailabilityService;
 import com.platform.service.EmployeeLocationServicePriceService;
 import com.platform.service.EmployeeService;
-import com.platform.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -24,7 +24,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -52,7 +51,6 @@ public class EmployeeController {
     // path (it is an action on an employee), but the logic stays where the join table's
     // ownership and cross-tenant validators already are.
     private final EmployeeLocationServicePriceService priceService;
-    private final UserService userService;
 
     @Operation(summary = "List employees",
             description = "Returns a paginated list of the business's employees. Public - no authentication required.")
@@ -138,8 +136,7 @@ public class EmployeeController {
     public ResponseEntity<EmployeeResponseDTO> getEmployeeForAdmin(
             @Parameter(description = "Employee UUID")
             @PathVariable UUID employeeId,
-            Authentication authentication) {
-        User currentUser = userService.getUserByUsername(authentication.getName());
+            @CurrentUser User currentUser) {
         return ResponseEntity.ok(employeeService.getEmployeeForAdmin(employeeId, currentUser));
     }
 
@@ -176,8 +173,9 @@ public class EmployeeController {
     public ResponseEntity<EmployeeResponseDTO> createEmployee(
             @Parameter(description = "Business UUID")
             @PathVariable("businessId") UUID businessId,
-            @Valid @RequestBody EmployeeRequestDTO request) {
-        EmployeeResponseDTO employee = employeeService.createEmployee(businessId, request);
+            @Valid @RequestBody EmployeeRequestDTO request,
+            @CurrentUser User currentUser) {
+        EmployeeResponseDTO employee = employeeService.createEmployee(businessId, request, currentUser);
         return new ResponseEntity<>(employee, HttpStatus.CREATED);
     }
 
@@ -203,8 +201,7 @@ public class EmployeeController {
             @Parameter(description = "Employee UUID")
             @PathVariable UUID employeeId,
             @Valid @RequestBody EmployeeServiceAssignmentRequestDTO request,
-            Authentication authentication) {
-        User currentUser = userService.getUserByUsername(authentication.getName());
+            @CurrentUser User currentUser) {
         return ResponseEntity.ok(
                 priceService.assignServicesAtBasePrice(businessId, employeeId, request, currentUser));
     }
@@ -224,8 +221,7 @@ public class EmployeeController {
             @Parameter(description = "Employee UUID")
             @PathVariable UUID employeeId,
             @Valid @RequestBody EmployeeRequestDTO request,
-            Authentication authentication) {
-        User currentUser = userService.getUserByUsername(authentication.getName());
+            @CurrentUser User currentUser) {
         EmployeeResponseDTO employee = employeeService.updateEmployee(businessId, employeeId, request, currentUser);
         return ResponseEntity.ok(employee);
     }
@@ -243,8 +239,7 @@ public class EmployeeController {
             @PathVariable UUID businessId,
             @Parameter(description = "Employee UUID")
             @PathVariable UUID employeeId,
-            Authentication authentication) {
-        User currentUser = userService.getUserByUsername(authentication.getName());
+            @CurrentUser User currentUser) {
         employeeService.deleteEmployee(businessId, employeeId, currentUser);
         return ResponseEntity.noContent().build();
     }
@@ -264,8 +259,7 @@ public class EmployeeController {
             @PathVariable UUID businessId,
             @Parameter(description = "Employee UUID")
             @PathVariable UUID employeeId,
-            Authentication authentication) {
-        User currentUser = userService.getUserByUsername(authentication.getName());
+            @CurrentUser User currentUser) {
         employeeService.hardDeleteEmployee(businessId, employeeId, currentUser);
         return ResponseEntity.noContent().build();
     }

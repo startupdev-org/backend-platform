@@ -18,6 +18,7 @@ import com.platform.repository.EmployeeLocationServicePriceRepository;
 import com.platform.repository.EmployeeRepository;
 import com.platform.repository.LocationRepository;
 import com.platform.repository.ServiceRepository;
+import com.platform.utils.BusinessOwnershipValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -290,10 +291,7 @@ public class EmployeeLocationServicePriceService {
         Business business = businessRepository.findById(businessId)
                 .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_NOT_FOUND));
 
-        if (business.isNotOwner(currentUser) &&
-                !currentUser.getRole().equals(User.UserRole.PLATFORM_ADMIN)) {
-            throw new BusinessException("Unauthorized");
-        }
+        BusinessOwnershipValidator.assertOwner(business, currentUser);
 
         return business;
     }

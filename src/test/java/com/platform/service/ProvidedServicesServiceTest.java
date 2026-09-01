@@ -62,7 +62,6 @@ class ProvidedServicesServiceTest {
     private ProvidedServicesService providedServicesService;
 
     @Mock private ServiceRepository serviceRepository;
-    @Mock private UserService userService;
     @Mock private BusinessRepository businessRepository;
     @Mock private BookingRepository bookingRepository;
 
@@ -70,11 +69,13 @@ class ProvidedServicesServiceTest {
 
     private User owner;
     private Business ownedBusiness;
+    private User currentCaller;
 
     @BeforeEach
     void setUp() {
         owner = user(User.UserRole.BUSINESS_ADMIN);
         ownedBusiness = business(owner);
+        currentCaller = owner;
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(EMAIL, null,
                         List.of(new SimpleGrantedAuthority("ROLE_BUSINESS_ADMIN"))));
@@ -97,7 +98,7 @@ class ProvidedServicesServiceTest {
             return saved;
         });
 
-        ServiceResponseDTO response = providedServicesService.createService(ownedBusiness.getId(), request());
+        ServiceResponseDTO response = providedServicesService.createService(ownedBusiness.getId(), request(), currentCaller);
 
         ArgumentCaptor<ProvidedService> captor = ArgumentCaptor.forClass(ProvidedService.class);
         verify(serviceRepository).save(captor.capture());
@@ -115,7 +116,7 @@ class ProvidedServicesServiceTest {
         when(businessRepository.findById(ownedBusiness.getId())).thenReturn(Optional.of(ownedBusiness));
 
         assertThrows(BusinessException.class,
-                () -> providedServicesService.createService(ownedBusiness.getId(), request()));
+                () -> providedServicesService.createService(ownedBusiness.getId(), request(), currentCaller));
 
         verify(serviceRepository, never()).save(any());
     }
@@ -126,7 +127,7 @@ class ProvidedServicesServiceTest {
         when(businessRepository.findById(ownedBusiness.getId())).thenReturn(Optional.of(ownedBusiness));
         when(serviceRepository.save(any(ProvidedService.class))).thenAnswer(i -> i.getArgument(0));
 
-        providedServicesService.createService(ownedBusiness.getId(), request());
+        providedServicesService.createService(ownedBusiness.getId(), request(), currentCaller);
 
         verify(serviceRepository).save(any(ProvidedService.class));
     }
@@ -137,7 +138,7 @@ class ProvidedServicesServiceTest {
         when(businessRepository.findById(missing)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class,
-                () -> providedServicesService.createService(missing, request()));
+                () -> providedServicesService.createService(missing, request(), currentCaller));
 
         verifyNoInteractions(serviceRepository);
     }
@@ -153,7 +154,7 @@ class ProvidedServicesServiceTest {
         when(serviceRepository.save(existing)).thenReturn(existing);
 
         ServiceResponseDTO response =
-                providedServicesService.updateService(ownedBusiness.getId(), existing.getId(), request());
+                providedServicesService.updateService(ownedBusiness.getId(), existing.getId(), request(), currentCaller);
 
         assertEquals("Haircut", response.getName());
         assertEquals(new BigDecimal("250.00"), response.getPrice());
@@ -167,7 +168,7 @@ class ProvidedServicesServiceTest {
         when(businessRepository.findById(ownedBusiness.getId())).thenReturn(Optional.of(ownedBusiness));
 
         assertThrows(BusinessException.class, () -> providedServicesService
-                .updateService(ownedBusiness.getId(), UUID.randomUUID(), request()));
+                .updateService(ownedBusiness.getId(), UUID.randomUUID(), request(), currentCaller));
 
         verify(serviceRepository, never()).save(any());
     }
@@ -180,7 +181,7 @@ class ProvidedServicesServiceTest {
         when(serviceRepository.findById(missing)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class,
-                () -> providedServicesService.updateService(ownedBusiness.getId(), missing, request()));
+                () -> providedServicesService.updateService(ownedBusiness.getId(), missing, request(), currentCaller));
     }
 
     /** A null {@code active} means "leave it as it is", not "deactivate". */
@@ -196,7 +197,7 @@ class ProvidedServicesServiceTest {
         withoutActive.setActive(null);
 
         assertEquals(false, providedServicesService
-                .updateService(ownedBusiness.getId(), existing.getId(), withoutActive).getActive());
+                .updateService(ownedBusiness.getId(), existing.getId(), withoutActive, currentCaller).getActive());
     }
 
     // ── BP-34: the cross-business hole, pinned as it currently behaves ────────
@@ -222,7 +223,7 @@ class ProvidedServicesServiceTest {
         when(serviceRepository.findById(theirService.getId())).thenReturn(Optional.of(theirService));
         when(serviceRepository.save(theirService)).thenReturn(theirService);
 
-        providedServicesService.updateService(ownedBusiness.getId(), theirService.getId(), request());
+        providedServicesService.updateService(ownedBusiness.getId(), theirService.getId(), request(), currentCaller);
 
         // Documented defect: the write went through, onto a row of a business the caller
         // does not own, and the service still belongs to that other business.
@@ -458,8 +459,9 @@ class ProvidedServicesServiceTest {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /** Records the caller the create/update methods now take as an explicit @CurrentUser arg (BP-40). */
     private void stubCurrentUser(User user) {
-        when(userService.getUserByUsername(anyString())).thenReturn(user);
+        this.currentCaller = user;
     }
 
     private User user(User.UserRole role) {

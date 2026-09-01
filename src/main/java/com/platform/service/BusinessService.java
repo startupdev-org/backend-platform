@@ -19,6 +19,7 @@ import com.platform.repository.BusinessRepository;
 import com.platform.repository.BusinessWorkingHoursRepository;
 import com.platform.repository.spec.BusinessSpecifications;
 import com.platform.storage.ImageUrlResolver;
+import com.platform.utils.BusinessOwnershipValidator;
 import com.platform.utils.SlugGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -26,8 +27,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,9 +54,7 @@ public class BusinessService {
     public static final Sort DEFAULT_SORT = Sort.by(Sort.Direction.DESC, "createdAt");
 
     @Transactional
-    public BusinessResponseDTO createBusiness(BusinessRequestDTO dto) {
-        User owner = getUser();
-
+    public BusinessResponseDTO createBusiness(BusinessRequestDTO dto, User owner) {
         String slug = SlugGenerator.generate(dto.getName());
 
         if (!owner.getRole().equals(User.UserRole.BUSINESS_ADMIN))
@@ -133,16 +130,11 @@ public class BusinessService {
     }
 
     @Transactional
-    public BusinessResponseDTO updateBusiness(UUID id, BusinessRequestDTO dto) {
+    public BusinessResponseDTO updateBusiness(UUID id, BusinessRequestDTO dto, User currentUser) {
         Business business = businessRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_EXCEPTION));
 
-        User currentUser = getUser();
-
-        if (!business.getOwner().getId().equals(currentUser.getId()) &&
-            !currentUser.getRole().equals(User.UserRole.PLATFORM_ADMIN)) {
-            throw new BusinessException("Unauthorized");
-        }
+        BusinessOwnershipValidator.assertOwner(business, currentUser);
 
         business.setName(dto.getName());
         business.setDescription(dto.getDescription());
@@ -160,10 +152,7 @@ public class BusinessService {
         Business business = businessRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(BUSINESS_EXCEPTION));
 
-        if (!business.getOwner().getId().equals(currentUser.getId()) &&
-            !currentUser.getRole().equals(User.UserRole.PLATFORM_ADMIN)) {
-            throw new BusinessException("Unauthorized");
-        }
+        BusinessOwnershipValidator.assertOwner(business, currentUser);
 
         businessRepository.delete(business);
     }
@@ -225,16 +214,6 @@ public class BusinessService {
                         ownersById.get(b.getOwner().getId()),
                         imageUrls))
                 .toList();
-    }
-
-    private User getUser() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        String username = (String) auth.getPrincipal();
-        return getUserByUsername(username);
-    }
-
-    private User getUserByUsername(String username) {
-        return userService.getUserByUsername(username);
     }
 
     public Page<BusinessResponseDTO> listBusinessesByQuery(String query, Pageable pageable) {

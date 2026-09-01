@@ -191,6 +191,11 @@
     </dependencies>
 
     <build>
+        <!-- Fixed jar name: mvn package always writes target/app.jar, whatever the
+             project version is. The Dockerfile's `prebuilt` stage and .dockerignore
+             both name that path literally, so a version bump must not move it. -->
+        <finalName>app</finalName>
+
         <plugins>
 
             <!-- Single compiler plugin with ALL annotation processors -->

@@ -137,6 +137,16 @@ Tests use **Mockito** (`@ExtendWith(MockitoExtension.class)`) — no Spring cont
 
 ## CI / Deployment
 
-Two workflows, one per deployed environment. Push to `dev` → `.github/workflows/dev.yml`: `mvn test` → Docker image pushed to GHCR as `:dev` → `RENDER_DEPLOY_HOOK_URL`. Push to `main` → `.github/workflows/prod.yml`: same, tagged `:latest` and `:<sha>` (the SHA tag is what a rollback points at) → `RENDER_PROD_DEPLOY_HOOK_URL`. A failing test blocks both deploys.
+Two workflows, one per deployed environment, kept structurally identical. Push to `dev` → `.github/workflows/dev.yml`: `mvn -B verify` → image built, scanned, and pushed to GHCR as `:dev` → `RENDER_DEPLOY_HOOK_URL`. Push to `main` → `.github/workflows/prod.yml`: same, tagged `:latest` and `:<sha>` (the SHA tag is what a rollback points at) → `RENDER_PROD_DEPLOY_HOOK_URL`. A failing test still blocks both deploys — `mvn -B verify` is the first real step and every step after it is skipped when it fails.
 
-The root `Dockerfile` is multi-stage and self-contained (Maven build → `eclipse-temurin:17-jre`, non-root user), so CI does not build the jar separately.
+**The project compiles exactly once per run.** `mvn -B verify` runs the tests (output stays visible in the workflow log) *and* produces the jar. `<finalName>app</finalName>` in the pom fixes that at `target/app.jar`, so nothing downstream has to glob for a version number.
+
+The root `Dockerfile` is still multi-stage and **still self-contained** — `docker build .` on a clean checkout compiles from source with no prior Maven run, which is the local path. A global `ARG JAR_SOURCE` selects where the jar comes from: `build` (the default) compiles it inside the image, `prebuilt` copies `target/app.jar` out of the build context. CI passes `build-args: JAR_SOURCE=prebuilt`, so the Docker build never runs Maven and the project is not compiled a second time. BuildKit only builds the stages the selected target depends on, so the unused branch costs nothing — which also means **BuildKit is required** (the default in Docker 23+, and always what buildx uses).
+
+`.dockerignore` exists for this: `target/*` followed by `!target/app.jar` lets exactly that one file through. Without it every build would upload `classes/`, `test-classes/`, `surefire-reports/` and `app.jar.original` into the context and invalidate the layer cache on every run. It also keeps `.git`, `.github`, `.claude`, `docs`, `database`, `node_modules` and any local `secrets.properties` out of the build context.
+
+Layer caching is `cache-from: type=gha` / `cache-to: type=gha,mode=max` on `docker/build-push-action`, which needs the `docker-container` driver — hence the `docker/setup-buildx-action` step.
+
+**The image is scanned before it is pushed.** The build step uses `load: true` (local daemon only), Trivy scans that image and fails the job on HIGH or CRITICAL, and only then does a second `build-push-action` — all cache hits, upload only — push to GHCR. A vulnerable image therefore never reaches the registry, let alone Render. The scan sets `ignore-unfixed: true`: an unpatched base-image CVE that nobody can act on must not permanently red-light every deploy. The push step also attaches an SBOM and a provenance attestation (`sbom: true`, `provenance: true`), which makes the pushed tag an OCI image index rather than a single manifest.
+
+Both `FROM` lines still use floating tags. Pinning them by digest is a known follow-up — it buys reproducible rebuilds at the cost of a manual bump for every base-image security update.

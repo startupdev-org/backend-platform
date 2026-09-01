@@ -121,12 +121,21 @@ Three runtime contexts, two databases:
 Locally, copy `src/main/resources/secrets.properties.example` to `secrets.properties` (gitignored) and fill it in. Required keys:
 
 ```
+# No default in application.yml — the app will not start without these:
 DB_URL       # full Neon JDBC string, incl. sslmode/channelBinding
 DB_USER, DB_PASSWORD
-JWT_SECRET   # ≥32 chars, no default — startup fails without it
-JWT_EXPIRATION  # ms, default 86400000
+JWT_SECRET   # ≥32 chars
 ALLOWED_ORIGINS
-SERVER_PORT  # local only; Render supplies PORT, which wins
+STORAGE_BUCKET  # required even if you never upload an image
+
+# Defaulted — set only to override:
+JWT_EXPIRATION             # ms, default 900000 (15 min)
+JWT_REFRESH_EXPIRATION     # ms, default 2592000000 (30 days)
+PASSWORD_RESET_EXPIRATION  # ms, default 1800000 (30 min)
+FRONTEND_BASE_URL          # default http://localhost:5173
+SERVER_PORT                # local only; Render supplies PORT, which wins
+R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_PUBLIC_URL_BASE
+                           # default empty; every image upload fails without them
 ```
 
 **Schema is owned by Flyway**, never by Hibernate. `ddl-auto` is `validate` in every profile and must stay that way — it is the guard that fails startup when the entities and the migrations drift apart. Migrations live in `src/main/resources/db/migration` as `V<n>__description.sql`; `V1__baseline_schema.sql` was generated from the entity mappings. `baseline-on-migrate: true` is set because both Neon databases predate Flyway and already carry a schema. Every entity change now ships with its own migration in the same commit.

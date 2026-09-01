@@ -35,6 +35,22 @@ class LocationServiceTest {
     @InjectMocks
     private LocationService locationService;
 
+    // ==================== Location builder default (BP-54) ====================
+
+    // Location is @Builder without @Builder.Default on isDefaultLocation, so Lombok used
+    // to drop the `= false` initializer and Location.builder()...build() produced null
+    // against a NOT NULL column - the exact bug V2__user_profile_fields.sql documents for
+    // User.isEnabled. It was masked only because LocationService.createLocation happens to
+    // set the field explicitly (see createLocation_success above); this pins the entity
+    // default directly so any other construction path stays safe.
+    @Test
+    void builderDefault_isDefaultLocation_isFalseNotNull() {
+        Location location = Location.builder().build();
+
+        assertNotNull(location.getIsDefaultLocation());
+        assertFalse(location.getIsDefaultLocation());
+    }
+
     // ==================== createLocation ====================
 
     @Test
